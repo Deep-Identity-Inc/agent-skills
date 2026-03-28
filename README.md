@@ -7,8 +7,6 @@ This repository makes [deepidv](https://deepidv.com)'s verification capabilities
 
 deepidv is a full-stack identity verification and fraud prevention platform covering ID verification, face liveness, deepfake detection, AML screening, background checks, and more — all from a single API. Three workstreams define how that connects to the agentic ecosystem.
 
----
-
 ## The Workstreams
 
 ### Verify Skill
@@ -26,8 +24,6 @@ Any compatible AI agent can load this skill from the repository and immediately 
 
 Compatible with Claude Code, Codex, Cursor, Windsurf, and OpenCode. Full invocation guidance, endpoint routing, authentication instructions, and worked examples are in [skills/deepidv-verify/SKILL.md](skills/deepidv-verify/SKILL.md).
 
----
-
 ### MCP Server
 
 The MCP server turns deepidv's platform operations into structured tools that AI agents and orchestration frameworks can call directly. Verification workflows, compliance cases, screening history, and platform administration are all reachable over the Model Context Protocol.
@@ -41,15 +37,11 @@ The MCP server turns deepidv's platform operations into structured tools that AI
 
 Built on Node.js and TypeScript with OAuth 2.0 + PKCE authentication. Full architecture detail is in [docs/architecture.md](docs/architecture.md).
 
----
-
 ### deepAI Assistant Skill
 
 The deepAI Assistant is a coding agent skill that activates in context when you're building a deepidv integration. Rather than bouncing between docs and your editor, you get SDK guidance, error explanations, webhook setup help, and compliance workflow advice inline — exactly where you need it.
 
 The assistant loads automatically when a coding agent detects deepidv SDK usage, API calls, webhook configuration, or KYC workflow implementation in the active codebase. It covers the Node.js and Python SDKs and all public API surfaces.
-
----
 
 ## Marketplace Distribution
 
@@ -57,21 +49,15 @@ The Verify skill is listed across the major agent skill directories and MCP mark
 
 If you maintain a skill directory and would like to list this skill, open an issue or reach out to [sales@deepidv.com](mailto:sales@deepidv.com).
 
----
-
 ## Contributing
 
 Bug reports, corrections to reference documentation, and improvements to skill definitions are welcome. Open an issue to discuss before submitting a pull request for anything substantial.
-
----
 
 ## About deepidv
 
 deepidv is a full-stack verification engine built to replace the fragmented stack of identity providers most teams are stuck with. It verifies identities, runs compliance screening, and monitors for fraud continuously — from a single platform with one API, one dashboard, and one team behind it.
 
 Learn more at [deepidv.com](https://deepidv.com).
-
----
 
 ## License
 
