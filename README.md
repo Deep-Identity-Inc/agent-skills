@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="skills/deepidv-verify/assets/deepidv-logo.png" alt="deepidv" width="220" />
+  <img src="https://www.deepidv.com/logos/deepidv-logo-white.png" alt="deepidv" width="220" />
 </div>
 
 # deepidv — AI-Powered Verification Engine
