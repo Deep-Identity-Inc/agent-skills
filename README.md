@@ -1,3 +1,7 @@
+<div align="center">
+  <img src="skills/deepidv-verify/assets/deepidv-logo.png" alt="deepidv" width="220" />
+</div>
+
 # deepidv — AI-Powered Verification Engine
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
