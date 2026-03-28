@@ -4,7 +4,7 @@ Use this checklist when preparing marketplace submissions for the deepidv Verify
 
 ## Before Submission
 
-- [ ] Repository is public.
+- [x] Repository is public.
 - [x] Verify skill lives under `skills/deepidv-verify/`.
 - [x] `SKILL.md` includes YAML frontmatter with `name` and `description`.
 - [x] Structured agent metadata exists in `skills/deepidv-verify/agents/openai.yaml`.
