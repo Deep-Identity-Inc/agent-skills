@@ -1,11 +1,14 @@
-# deepidv Agent Skills and MCP Server
+# deepidv — AI-Powered Verification Engine
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Skill Standard](https://img.shields.io/badge/agent--skills-v1.0-green.svg)](https://github.com/anthropics/agent-skills-spec)
+[![GDPR Compliant](https://img.shields.io/badge/GDPR-Compliant-0057b8)](https://deepidv.com)
+[![SOC 2 Compliant](https://img.shields.io/badge/SOC_2-Compliant-0057b8)](https://deepidv.com)
+[![CCPA Compliant](https://img.shields.io/badge/CCPA-Compliant-0057b8)](https://deepidv.com)
 
-This repository makes [deepidv](https://deepidv.com)'s verification capabilities accessible to AI agents — and brings agentic AI into the deepidv platform itself.
+**Verify anyone, anywhere in seconds.** [deepidv](https://deepidv.com) is an AI-powered verification engine that replaces the fragmented stack of identity vendors with a single platform — ID verification, face liveness, deepfake detection, AML screening, background checks, and more, all from one API.
 
-deepidv is a full-stack identity verification and fraud prevention platform covering ID verification, face liveness, deepfake detection, AML screening, background checks, and more — all from a single API. Three workstreams define how that connects to the agentic ecosystem.
+This repository makes those capabilities accessible to AI agents and brings agentic intelligence into the deepidv platform itself. Three workstreams define how.
 
 ## The Workstreams
 
