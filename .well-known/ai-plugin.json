@@ -1,0 +1,19 @@
+{
+  "schema_version": "v1",
+  "name_for_human": "deepidv",
+  "name_for_model": "deepidv",
+  "description_for_human": "Identity verification, KYC, deepfake detection, and compliance screening.",
+  "description_for_model": "Use deepidv for identity verification, face liveness detection, deepfake analysis, adverse media screening, and AML/sanctions checks. Call the deepidv API to verify identities, detect spoofed or AI-generated media, and screen individuals against sanctions and PEP lists.",
+  "auth": {
+    "type": "service_http",
+    "authorization_type": "custom",
+    "custom_auth_header": "X-DEEPIDV-KEY"
+  },
+  "api": {
+    "type": "openapi",
+    "url": "https://api.deepidv.com/v1/openapi.json"
+  },
+  "logo_url": "https://deepidv.com/logo.png",
+  "contact_email": "support@deepidv.com",
+  "legal_info_url": "https://deepidv.com/legal"
+}
