@@ -2,7 +2,7 @@
   <img src="https://www.deepidv.com/logos/deepidv-logo-white.png" alt="deepidv" width="220" />
 </div>
 
-# deepidv — AI-Powered Verification Engine
+# deepidv: AI-Powered Verification Engine
 
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](LICENSE)
 [![Skill Standard](https://img.shields.io/badge/agent--skills-v1.0-green.svg)](https://github.com/anthropics/agent-skills-spec)
@@ -10,7 +10,7 @@
 [![SOC 2 Compliant](https://img.shields.io/badge/SOC_2-Compliant-0057b8)](https://deepidv.com)
 [![CCPA Compliant](https://img.shields.io/badge/CCPA-Compliant-0057b8)](https://deepidv.com)
 
-**Verify anyone, anywhere in seconds.** [deepidv](https://deepidv.com) is an AI-powered verification engine that replaces the fragmented stack of identity vendors with a single platform — ID verification, face liveness, deepfake detection, AML screening, background checks, and more, all from one API.
+**Verify anyone, anywhere in seconds.** [deepidv](https://deepidv.com) is an AI-powered verification engine that replaces the fragmented stack of identity vendors with a single platform. ID verification, face liveness, deepfake detection, AML screening, background checks, and more, all from one API.
 
 This repository makes those capabilities accessible to AI agents and brings agentic intelligence into the deepidv platform itself. Three workstreams define how.
 
@@ -18,7 +18,7 @@ This repository makes those capabilities accessible to AI agents and brings agen
 
 ### Verify Skill
 
-Any compatible AI agent can load this skill from the repository and immediately call deepidv's verification and screening APIs — no separate integration required. Endpoint routing, authentication, and request formatting are all handled by the skill.
+Any compatible AI agent can load this skill from the repository and immediately call deepidv's verification and screening APIs with no separate integration required. Endpoint routing, authentication, and request formatting are all handled by the skill.
 
 | Capability                  | What it does                                                                            |
 | --------------------------- | --------------------------------------------------------------------------------------- |
@@ -46,7 +46,7 @@ Built on Node.js and TypeScript with OAuth 2.0 + PKCE authentication. Full archi
 
 ### deepAI Assistant Skill
 
-The deepAI Assistant is a coding agent skill that activates in context when you're building a deepidv integration. Rather than bouncing between docs and your editor, you get SDK guidance, error explanations, webhook setup help, and compliance workflow advice inline — exactly where you need it.
+The deepAI Assistant is a coding agent skill that activates in context when you're building a deepidv integration. Rather than bouncing between docs and your editor, you get SDK guidance, error explanations, webhook setup help, and compliance workflow advice right in your editor.
 
 The assistant loads automatically when a coding agent detects deepidv SDK usage, API calls, webhook configuration, or KYC workflow implementation in the active codebase. It covers the Node.js and Python SDKs and all public API surfaces.
 
@@ -62,7 +62,7 @@ Bug reports, corrections to reference documentation, and improvements to skill d
 
 ## About deepidv
 
-deepidv is a full-stack verification engine built to replace the fragmented stack of identity providers most teams are stuck with. It verifies identities, runs compliance screening, and monitors for fraud continuously — from a single platform with one API, one dashboard, and one team behind it.
+deepidv is a full-stack verification engine built to replace the fragmented stack of identity providers most teams are stuck with. It verifies identities, runs compliance screening, and monitors for fraud continuously. One platform, one API, one dashboard, one team.
 
 Learn more at [deepidv.com](https://deepidv.com).
 
