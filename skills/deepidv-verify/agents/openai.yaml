@@ -1,8 +1,8 @@
 interface:
   display_name: "deepidv Verify"
   short_description: "Identity verification, KYC, and compliance screening"
-  icon_small: "../assets/deepidv-icon-sm.svg"
-  icon_large: "../assets/deepidv-icon-lg.svg"
+  icon_small: "./assets/deepidv-icon-sm.svg"
+  icon_large: "./assets/deepidv-icon-lg.svg"
   brand_color: "#6C5CE7"
 
 policy:
