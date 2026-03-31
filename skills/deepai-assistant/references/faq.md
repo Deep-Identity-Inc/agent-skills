@@ -11,7 +11,7 @@ A: deepidv is an identity verification and compliance platform offering face liv
 A: Passports, driver's licenses, and national ID cards from 190+ countries.
 
 **Q: Is there a sandbox environment?**
-A: Yes. Use `https://sandbox.api.deepidv.com/v1` with `sk_test_` prefixed API keys.
+A: Yes. Use `https://api.deepidv.com/v1` with sandbox API keys. The key determines whether traffic is treated as sandbox or production.
 
 ## API
 
