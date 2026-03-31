@@ -48,20 +48,20 @@ Agents can discover this skill directly from this repository.
 
 Choose the endpoint that matches the user intent directly:
 
-| User Intent                                                    | Endpoint                        |
-| -------------------------------------------------------------- | ------------------------------- |
-| Confirm the selfie came from a live person                     | `POST /v1/verify/liveness`      |
-| Verify a government ID against a selfie                        | `POST /v1/verify/identity`      |
-| Check whether an image or video is AI-generated or manipulated | `POST /v1/verify/deepfake`      |
-| Search news and public reports for adverse media risk          | `POST /v1/screen/adverse-media` |
-| Screen against sanctions, PEP, and watchlists                  | `POST /v1/screen/aml`           |
-| Run a complete verification and screening flow in one call     | `POST /v1/verify/full`          |
+| User Intent                                                               | Endpoint                                |
+| ------------------------------------------------------------------------- | --------------------------------------- |
+| Start a new applicant verification flow                                   | `POST /v1/sessions`                     |
+| Find existing sessions by creator, organization, workflow, or external ID | `GET /v1/sessions`                      |
+| Inspect the full outcome of one verification session                      | `GET /v1/sessions/{id}`                 |
+| Manually resolve a session as approved or rejected                        | `PATCH /v1/sessions/{id}/update-status` |
+| Discover which workflows are available before creating a session          | `GET /v1/workflows`                     |
+| Inspect the exact steps configured in one workflow                        | `GET /v1/workflows/{id}`                |
 
-Do not ask the user to choose an endpoint if the request already implies the correct capability.
+Do not ask the user to choose an endpoint if the request already implies the right operation.
 
 ## Authentication
 
-All requests require API-key authentication with the `X-DEEPIDV-KEY` header.
+All requests require API-key authentication with the `x-api-key` header.
 
 Credential lookup order:
 
@@ -78,302 +78,257 @@ DEEPIDV_API_KEY=sk_test_example
 Request header:
 
 ```http
-X-DEEPIDV-KEY: <api_key>
+x-api-key: <api_key>
 ```
 
 Never commit keys to the repository. Use sandbox keys for testing and live keys for production traffic.
 
 ## Base URL
 
-| Environment | Base URL                             | Intended Key Type |
-| ----------- | ------------------------------------ | ----------------- |
-| Production  | `https://api.deepidv.com/v1`         | Live key          |
-| Sandbox     | `https://sandbox.api.deepidv.com/v1` | Sandbox key       |
+Use a single base URL for all session and workflow traffic:
 
-The skill supports sandbox and production without code changes:
+- `https://api.deepidv.com/v1`
 
-- Set `DEEPIDV_ENV=sandbox` to target sandbox.
-- Set `DEEPIDV_ENV=production` to target production.
-- Set `DEEPIDV_BASE_URL` only when you need an explicit override.
+The API key determines whether the request is handled as sandbox or production traffic.
 
 ## Sandbox Mode
 
-Use sandbox for testing request construction, endpoint selection, and response handling without sending production traffic.
+Use sandbox for testing request construction, workflow selection, and redirect handling without sending production traffic.
 
-- Use sandbox keys against `https://sandbox.api.deepidv.com/v1`.
-- Use test media and non-production identity data when validating flows.
-- Expect the same top-level response envelope as production, including `request_id`, `status`, `result`, `risk_score`, and `metadata`.
-- Validate retry behavior and throttling assumptions against sandbox before promoting a workflow to production.
+- Use sandbox keys against `https://api.deepidv.com/v1`.
+- Use non-production applicant data when validating session flows.
+- Confirm pagination, workflow selection, and redirect handling in sandbox before enabling production traffic.
 
 ## Endpoint Reference
 
 ### Common Request Pattern
 
-All endpoints accept JSON request bodies.
+Create and update endpoints accept JSON request bodies.
 
 ```http
-POST {base_url}/{path}
+POST {base_url}/sessions
+PATCH {base_url}/sessions/{id}/update-status
 Content-Type: application/json
-X-DEEPIDV-KEY: <api_key>
-X-Request-ID: <optional_uuid>
+x-api-key: <api_key>
 ```
 
-`X-Request-ID` is optional and should be supplied when callers want request correlation or idempotent retry behavior.
+List and retrieve endpoints require the `x-api-key` header and do not require a request body.
 
-### Common Response Envelope
+### Endpoint Summary
 
-```json
-{
-  "request_id": "req_abc123",
-  "status": "completed",
-  "result": {},
-  "risk_score": 12,
-  "metadata": {
-    "processing_ms": 247,
-    "model_version": "2.1.0"
-  }
-}
-```
+| Operation             | Endpoint                                | Use When                                                       | Required Inputs                             | High-Value Response Fields                                |
+| --------------------- | --------------------------------------- | -------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------- |
+| Create Session        | `POST /v1/sessions`                     | You need to start a verification flow for an applicant         | `first_name`, `last_name`, `email`, `phone` | `id`, `session_url`, `externalId`, `links`                |
+| List Sessions         | `GET /v1/sessions`                      | You need to find prior sessions or paginate operational queues | none                                        | `sessions`, `next_token`                                  |
+| Retrieve Session      | `GET /v1/sessions/{id}`                 | You need detailed status, uploads, or analysis results         | path `id`                                   | `session_record`, `resource_links`, `user`, `sender_user` |
+| Update Session Status | `PATCH /v1/sessions/{id}/update-status` | Manual review has reached a final decision                     | path `id`, body `new_status`                | `session_record.status`, `session_record.updated_at`      |
+| List Workflows        | `GET /v1/workflows`                     | You need to discover available workflow IDs                    | none                                        | `workflows[].id`, `workflows[].name`                      |
+| Retrieve Workflow     | `GET /v1/workflows/{id}`                | You need exact workflow steps and configuration                | path `id`                                   | `workflow.steps`, `workflow.status`                       |
 
-Status values:
+### Create Session
 
-- `completed`: the result is final and ready to use.
-- `pending`: processing has started but the result is not final yet.
-- `failed`: the request could not be completed.
+`POST /v1/sessions`
 
-### Capability Guide
+Use when a workflow must be launched for a specific applicant.
 
-| Capability                  | Endpoint                        | Use When                                                     | Required Inputs                              | Optional Inputs                                                                            | Response Meaning                                                                                | Notable Risk or Decision Fields                                                                                                        |
-| --------------------------- | ------------------------------- | ------------------------------------------------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Face Liveness               | `POST /v1/verify/liveness`      | You need proof-of-life from a selfie or capture frame        | `image`                                      | `options.strictness`, `options.return_frames`                                              | Reports whether the face appears live or spoofed                                                | `result.is_live`, `result.liveness_score`, `result.spoof_type`, `risk_score`                                                           |
-| Identity Verification       | `POST /v1/verify/identity`      | You need document verification and face match for KYC        | `document.image`, `selfie`                   | `document.type`, `options.extract_data`, `options.match_threshold`                         | Reports whether the identity check passed, extracted identity fields, and document authenticity | `result.verified`, `result.face_match_score`, `result.document_authenticity`, `risk_score`                                             |
-| Deepfake Detection          | `POST /v1/verify/deepfake`      | You need to assess whether media is manipulated or synthetic | `media`, `media_type`                        | `options.detailed_analysis`                                                                | Reports whether deepfake indicators were found and how likely manipulation is                   | `result.is_deepfake`, `result.deepfake_probability`, `result.manipulation_type`, `risk_score`                                          |
-| Adverse Media Screening     | `POST /v1/screen/adverse-media` | You need reputational and public-reporting risk checks       | `name`                                       | `date_of_birth`, `nationality`, screening filters                                          | Returns adverse media hits and relevance scores                                                 | `result.hits`, `result.matches`, `risk_score`                                                                                          |
-| AML and Sanctions Screening | `POST /v1/screen/aml`           | You need sanctions, PEP, or watchlist screening              | `name`                                       | `date_of_birth`, `nationality`, `screening_types`, AML options                             | Returns watchlist hits, list coverage, and PEP classification                                   | `result.hits`, `result.matches`, `result.pep_classification`, `risk_score`                                                             |
-| Combined Verification       | `POST /v1/verify/full`          | You want one call to run verification plus screening         | `document.image`, `selfie`, `screening.name` | `document.type`, `screening.date_of_birth`, `screening.nationality`, orchestration options | Returns a combined decision and sub-results for each verification step                          | `result.overall_decision`, `result.liveness`, `result.identity`, `result.deepfake`, `result.adverse_media`, `result.aml`, `risk_score` |
+Important request notes:
 
-### Endpoint Details
-
-### Face Liveness
-
-`POST /v1/verify/liveness`
-
-Use when a workflow must confirm the selfie or capture frame came from a live person instead of a printout, replay, or mask.
+- Both camelCase and snake_case body fields are accepted.
+- If both are provided for the same field, the camelCase value wins.
+- `workflow_id` is optional. If omitted, the session runs as a standalone verification.
+- `redirect_url` must be a valid HTTPS URL.
 
 Representative request:
 
 ```json
 {
-  "image": "<base64_image>",
-  "options": {
-    "strictness": "standard",
-    "return_frames": false
-  }
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "john.doe@example.com",
+  "phone": "+15192223333",
+  "external_id": "user-12345",
+  "workflow_id": "wf_abc123",
+  "redirect_url": "https://yourapp.com/verify-callback"
 }
 ```
 
 High-level response meaning:
 
-- `result.is_live` states whether the capture passed proof-of-life.
-- `result.liveness_score` expresses confidence.
-- `result.spoof_type` explains the suspected attack when the check fails.
+- `id` is the session identifier used by all follow-up session endpoints.
+- `session_url` is the applicant-facing URL for completing verification.
+- `links` contains any associated verification links returned by the API.
 
-### Identity Verification
+Redirect handling:
 
-`POST /v1/verify/identity`
+- When `redirect_url` is present, the verification app sends the user back with `session_id`, `status`, and optional `reason` query parameters.
+- Published redirect `status` values are `success`, `failed`, and `abandoned`.
+- Published `reason` values include `document_unreadable`, `face_mismatch`, `session_expired`, `internal_error`, `user_cancelled`, and `unknown`.
 
-Use when onboarding, step-up verification, or re-verification requires document inspection plus selfie matching.
+### List Sessions
+
+`GET /v1/sessions`
+
+Use when an operator or integration needs to search for existing sessions.
+
+Supported query parameters:
+
+- `limit` from `1` to `500`.
+- `next_token` for pagination.
+- `start_date` and `end_date` in ISO 8601 format.
+- `by_organization=true` to query organization-wide sessions.
+- `external_id` to find a session from the caller's reference ID.
+- `workflow_id` to scope results to one workflow.
+
+Filtering priority from the docs:
+
+1. `external_id`
+2. `workflow_id`
+3. `by_organization`
+4. default sender-based query
+
+High-level response meaning:
+
+- `sessions` is a paginated list of session objects.
+- `next_token` is `null` when no additional page is available.
+
+### Retrieve Session
+
+`GET /v1/sessions/{id}`
+
+Use when you need the full verification outcome for one session.
+
+Important fields in `session_record`:
+
+- `status`: `PENDING`, `SUBMITTED`, `VERIFIED`, `REJECTED`, or `VOIDED`.
+- `type`: `session`, `verification`, `credit-application`, `silent-screening`, or `deep-doc`.
+- `session_progress`: `PENDING`, `STARTED`, or `COMPLETED`.
+- `workflow_id` and `workflow_steps` to correlate the run to its configured flow.
+- `uploads` to confirm which artifacts were submitted.
+- `analysis_data` for liveness, document, face match, sanctions, adverse media, and related results.
+
+Top-level response fields:
+
+- `session_record`
+- `resource_links`
+- `user`
+- `sender_user`
+
+### Update Session Status
+
+`PATCH /v1/sessions/{id}/update-status`
+
+Use when a manual or downstream review process must finalize a session.
 
 Representative request:
 
 ```json
 {
-  "document": {
-    "image": "<base64_document_image>",
-    "type": "passport"
-  },
-  "selfie": "<base64_selfie>",
-  "options": {
-    "extract_data": true,
-    "match_threshold": 80
-  }
+  "new_status": "VERIFIED"
 }
 ```
 
-High-level response meaning:
+Rules from the docs:
 
-- `result.verified` is the primary pass or fail signal.
-- `result.face_match_score` measures selfie-to-document match strength.
-- `result.document_authenticity` surfaces authenticity checks that may require review.
+- `new_status` must be `VERIFIED` or `REJECTED`.
+- The response returns the updated `session_record` only.
 
-### Deepfake Detection
+### List Workflows
 
-`POST /v1/verify/deepfake`
+`GET /v1/workflows`
 
-Use when image or video authenticity matters and AI manipulation needs to be ruled out.
-
-Representative request:
-
-```json
-{
-  "media": "<base64_media>",
-  "media_type": "image",
-  "options": {
-    "detailed_analysis": true
-  }
-}
-```
+Use when you need to discover workflow IDs before creating sessions.
 
 High-level response meaning:
 
-- `result.is_deepfake` indicates whether the media is likely manipulated.
-- `result.deepfake_probability` quantifies the likelihood of synthetic content.
-- `result.manipulation_type` helps route manual review.
+- `workflows` is an array of workflow summaries.
+- Each summary includes `id`, `name`, and `created_at`.
+- Results are sorted by creation date, newest first.
 
-### Adverse Media Screening
+### Retrieve Workflow
 
-`POST /v1/screen/adverse-media`
+`GET /v1/workflows/{id}`
 
-Use when reputational risk or negative-publicity checks are required for a person or entity.
-
-Representative request:
-
-```json
-{
-  "name": "Jane Doe",
-  "date_of_birth": "1990-05-15",
-  "nationality": "CA",
-  "options": {
-    "categories": ["fraud", "financial_crime"],
-    "date_range": "5y",
-    "min_relevance": 70
-  }
-}
-```
+Use when you need the workflow configuration behind a session or before creating one.
 
 High-level response meaning:
 
-- `result.hits` indicates whether any relevant records were found.
-- `result.matches` contains the news or reporting evidence to review.
-- `risk_score` provides a single risk signal for downstream policy.
+- `workflow.status` is `active` or `inactive`.
+- `workflow.steps` is the ordered verification sequence.
+- Each step has an `id` and a `config` object.
 
-### AML and Sanctions Screening
+Representative step IDs shown in the docs include:
 
-`POST /v1/screen/aml`
-
-Use when regulatory compliance requires sanctions, PEP, or watchlist screening.
-
-Representative request:
-
-```json
-{
-  "name": "Jane Doe",
-  "date_of_birth": "1990-05-15",
-  "nationality": "CA",
-  "screening_types": ["sanctions", "pep"],
-  "options": {
-    "fuzzy_threshold": 85,
-    "include_associates": false
-  }
-}
-```
-
-High-level response meaning:
-
-- `result.hits` reports match count.
-- `result.matches` holds the supporting list entries.
-- `result.pep_classification` flags politically exposed persons when applicable.
-
-### Combined Verification
-
-`POST /v1/verify/full`
-
-Use when the caller wants one orchestrated verification call instead of sequencing multiple endpoints.
-
-Representative request:
-
-```json
-{
-  "document": {
-    "image": "<base64_document_image>",
-    "type": "passport"
-  },
-  "selfie": "<base64_selfie>",
-  "screening": {
-    "name": "Jane Doe",
-    "date_of_birth": "1990-05-15",
-    "nationality": "CA"
-  },
-  "options": {
-    "skip": [],
-    "strictness": "standard"
-  }
-}
-```
-
-High-level response meaning:
-
-- `result.overall_decision` is the combined approval, review, or rejection output.
-- The sub-results identify which control raised risk.
-- `risk_score` gives the aggregate risk signal for workflow automation.
+- `id-verification`
+- `face-liveness`
+- `age-estimation`
+- `pep-sanctions`
+- `adverse-media`
+- `bank-statement-upload`
+- `document-upload`
+- `title-search`
+- `custom-prompt`
+- `custom-form`
+- `ai-bank-statement-analysis`
 
 ## Workflows
 
-### Full KYC Onboarding
+### Session Creation From Workflow
 
-1. Use `POST /v1/verify/full` when the caller already has document, selfie, and screening inputs.
-2. Use `POST /v1/verify/liveness` first when proof-of-life must be enforced before document capture.
-3. Follow with `POST /v1/verify/identity` if the flow needs standalone document verification evidence.
+1. Use `GET /v1/workflows` when the caller does not already know the workflow ID.
+2. Use `GET /v1/workflows/{id}` when step-level configuration must be reviewed before launch.
+3. Use `POST /v1/sessions` with `workflow_id` to create the applicant session.
 
-### Media Authenticity Review
+### Session Operations
 
-1. Use `POST /v1/verify/deepfake` for the media.
-2. Escalate to manual review when `result.is_deepfake` is true or `risk_score` exceeds internal thresholds.
+1. Use `GET /v1/sessions` to find the right session by external ID, workflow ID, creator, or organization scope.
+2. Use `GET /v1/sessions/{id}` to inspect the outcome, uploads, and analysis results.
+3. Use `PATCH /v1/sessions/{id}/update-status` only when a final manual decision must override or complete the session lifecycle.
 
-### Compliance Screening Only
+### Redirect-Based Integrations
 
-1. Use `POST /v1/screen/aml` for sanctions, PEP, and watchlists.
-2. Use `POST /v1/screen/adverse-media` when reputational screening is also required.
+1. Supply `redirect_url` on session creation when the user must return to an application flow after verification.
+2. Parse `session_id`, `status`, and optional `reason` from the redirect query string.
+3. Reconcile redirect outcomes against `GET /v1/sessions/{id}` if the integration needs authoritative analysis data.
 
 ## Error Handling
 
-Use the API response `status` together with the HTTP status code to decide whether to retry, correct inputs, or escalate.
+Use the HTTP status code together with the endpoint-specific validation rules from the docs.
 
-| HTTP Status | Meaning                                       | Action                                                         |
-| ----------- | --------------------------------------------- | -------------------------------------------------------------- |
-| `400`       | Invalid request body or missing required data | Fix the request shape before retrying                          |
-| `401`       | Missing or invalid API key                    | Refresh credentials and retry only after fixing authentication |
-| `403`       | Key lacks required permissions                | Use a key with the correct scope or entitlement                |
-| `422`       | Input cannot be processed successfully        | Replace unsupported or low-quality media and retry             |
-| `429`       | Rate limit exceeded                           | Wait for `Retry-After` before retrying                         |
-| `500`       | Unexpected service-side failure               | Retry with bounded exponential backoff                         |
-| `503`       | Temporary service unavailability              | Wait for `Retry-After` before retrying                         |
+| HTTP Status | Meaning                                                 | Action                                                         |
+| ----------- | ------------------------------------------------------- | -------------------------------------------------------------- |
+| `400`       | Invalid request parameters, body fields, or path format | Correct the request before retrying                            |
+| `401`       | Missing or invalid API key                              | Refresh credentials and retry only after fixing authentication |
+| `402`       | Insufficient token balance on session creation          | Replenish balance before retrying                              |
+| `403`       | Session or workflow belongs to a different organization | Use the correct organization context                           |
+| `404`       | Session or workflow ID not found                        | Re-check the supplied identifier                               |
+| `429`       | Rate limit exceeded                                     | Wait and retry conservatively                                  |
 
-Use the detailed error catalog for endpoint-specific recovery guidance:
+Use the detailed error catalog for operation-specific recovery guidance:
 
-- [Error codes](references/error-codes.md)
+- `references/error-codes.md`
 
 ## Rate Limits
 
-All six public Verify endpoints share the same account-level quota pool.
+The docs site exposes `429 Too Many Requests` for session and workflow endpoints but does not publish fixed numeric quotas in these pages.
 
-- Sandbox traffic uses the Free or Sandbox tier limits.
-- Check `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`, and `Retry-After` response headers.
-- Stop and wait when throttled instead of retrying in parallel.
+- Keep list requests paginated instead of trying to fetch everything at once.
+- Retry `429` responses conservatively.
+- Avoid parallel retry storms when polling or sweeping sessions.
 
-Published limit and retry guidance:
+Published guidance and client recommendations:
 
-- [Rate limits](references/rate-limits.md)
+- `references/rate-limits.md`
 
 ## Operator Guidance
 
-- Treat `pending` responses as incomplete and continue polling or workflow orchestration outside this skill.
-- Respect `Retry-After` on `429` and `503` responses.
-- Surface `request_id` in logs or user-visible diagnostics so support teams can trace requests.
+- Prefer workflow-backed session creation when business rules depend on a known step sequence.
+- Use `external_id` consistently so integrations can look sessions up without storing only deepidv IDs.
+- Treat redirect query parameters as a completion signal, then retrieve the session for authoritative analysis details when needed.
+- Surface session IDs in logs and support diagnostics.
 
 See the detailed references for contracts and operational guidance:
 
-- [API reference](references/api-reference.md)
-- [Error codes](references/error-codes.md)
-- [Rate limits](references/rate-limits.md)
-- [CLI wrapper](scripts/verify.sh)
+- `references/api-reference.md`
+- `references/error-codes.md`
+- `references/rate-limits.md`
+- `scripts/verify.sh`

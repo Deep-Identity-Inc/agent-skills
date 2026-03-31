@@ -1,17 +1,18 @@
-# deepidv Verify API Reference
+# deepidv Sessions and Workflows API Reference
 
-This document is the detailed request and response contract reference for the public deepidv Verify skill.
+This document summarizes the session and workflow endpoints currently published on the deepidv docs site.
 
-## Base URLs
+## Base URL
 
-| Environment | Base URL                             | Key Guidance                   |
-| ----------- | ------------------------------------ | ------------------------------ |
-| Production  | `https://api.deepidv.com/v1`         | Use live keys for real traffic |
-| Sandbox     | `https://sandbox.api.deepidv.com/v1` | Use sandbox keys for testing   |
+Use a single base URL for both sandbox and production traffic:
+
+- `https://api.deepidv.com/v1`
+
+The API key determines whether the request is processed in sandbox or production mode.
 
 ## Authentication
 
-All requests require the `X-DEEPIDV-KEY` header.
+All requests require the `x-api-key` header.
 
 Credential sources, in priority order:
 
@@ -33,288 +34,370 @@ sk_test_example
 
 ## Common Headers
 
-| Header          | Required | Description                                                     |
-| --------------- | -------- | --------------------------------------------------------------- |
-| `Content-Type`  | Yes      | Must be `application/json`                                      |
-| `X-DEEPIDV-KEY` | Yes      | deepidv API key                                                 |
-| `X-Request-ID`  | No       | Optional caller-supplied request correlation or idempotency key |
+| Header         | Required                   | Description                |
+| -------------- | -------------------------- | -------------------------- |
+| `x-api-key`    | Yes                        | deepidv API key            |
+| `Content-Type` | Yes for `POST` and `PATCH` | Must be `application/json` |
 
-## Common Response Envelope
+## Sessions
 
-Every endpoint returns the same top-level envelope.
+### 1. Create Session
 
-```json
-{
-  "request_id": "req_abc123",
-  "status": "completed",
-  "result": {},
-  "risk_score": 8,
-  "metadata": {
-    "processing_ms": 247,
-    "model_version": "2.1.0"
-  }
-}
-```
+`POST /v1/sessions`
 
-| Field                    | Type    | Meaning                                |
-| ------------------------ | ------- | -------------------------------------- |
-| `request_id`             | string  | Unique request trace identifier        |
-| `status`                 | string  | `completed`, `pending`, or `failed`    |
-| `result`                 | object  | Endpoint-specific result payload       |
-| `risk_score`             | integer | Aggregate risk score from `0` to `100` |
-| `metadata.processing_ms` | integer | Processing duration in milliseconds    |
-| `metadata.model_version` | string  | Model release used for the request     |
+Creates a new identity verification session and can optionally send email and SMS invitations.
 
-## Endpoint Contracts
+Body parameters:
 
-### 1. Face Liveness
+| Snake Case          | Camel Case        | Type    | Required | Description                                       |
+| ------------------- | ----------------- | ------- | -------- | ------------------------------------------------- |
+| `first_name`        | `firstName`       | string  | Yes      | Applicant first name                              |
+| `last_name`         | `lastName`        | string  | Yes      | Applicant last name                               |
+| `email`             | —                 | string  | Yes      | Applicant email address                           |
+| `phone`             | —                 | string  | Yes      | Applicant phone number in E.164 format            |
+| `external_id`       | `externalId`      | string  | No       | Caller reference for the session                  |
+| `send_email_invite` | `sendEmailInvite` | boolean | No       | Send an email invite, defaults to `true`          |
+| `send_phone_invite` | `sendPhoneInvite` | boolean | No       | Send an SMS invite, defaults to `true`            |
+| `workflow_id`       | `workflowId`      | string  | No       | Workflow to run. Omit for standalone verification |
+| `redirect_url`      | `redirectUrl`     | string  | No       | HTTPS return URL after the session ends           |
 
-`POST /v1/verify/liveness`
+Request notes:
 
-Use this endpoint when the caller needs proof-of-life for a selfie or captured face frame.
-
-Request body:
-
-| Field                   | Type    | Required | Default    | Description                                      |
-| ----------------------- | ------- | -------- | ---------- | ------------------------------------------------ |
-| `image`                 | string  | Yes      | None       | Base64-encoded image or extracted video frame    |
-| `options.strictness`    | string  | No       | `standard` | `low`, `standard`, or `high`                     |
-| `options.return_frames` | boolean | No       | `false`    | Include frame-level analysis for video workflows |
+- Both camelCase and snake_case are accepted.
+- If both are provided for the same field, the camelCase value takes priority.
 
 Example request:
 
 ```json
 {
-  "image": "<base64_image>",
-  "options": {
-    "strictness": "standard",
-    "return_frames": false
-  }
+  "first_name": "John",
+  "last_name": "Doe",
+  "email": "john.doe@example.com",
+  "phone": "+15192223333",
+  "external_id": "user-12345",
+  "workflow_id": "wf_abc123",
+  "redirect_url": "https://yourapp.com/verify-callback"
 }
 ```
 
-Response `result`:
+Success response:
 
-| Field            | Type           | Meaning                                                         |
-| ---------------- | -------------- | --------------------------------------------------------------- |
-| `is_live`        | boolean        | Whether the face passed proof-of-life                           |
-| `liveness_score` | integer        | Confidence score from `0` to `100`                              |
-| `confidence`     | string         | `low`, `medium`, or `high`                                      |
-| `spoof_type`     | string or null | Attack type such as `printed_photo`, `screen_replay`, or `mask` |
-| `frame_analysis` | array          | Per-frame detail when requested                                 |
+```json
+{
+  "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "session_url": "https://app.deepidv.com",
+  "externalId": "user-12345",
+  "links": []
+}
+```
 
-### 2. Identity Verification
+Response fields:
 
-`POST /v1/verify/identity`
+| Field         | Type   | Meaning                                  |
+| ------------- | ------ | ---------------------------------------- |
+| `id`          | string | Unique session identifier                |
+| `session_url` | string | Applicant-facing verification URL        |
+| `externalId`  | string | Caller reference, returned when provided |
+| `links`       | array  | Associated verification links            |
 
-Use this endpoint for KYC, document verification, and selfie-to-document face matching.
+Redirect URL behavior:
 
-Request body:
+- When `redirect_url` is provided, the returned `session_url` includes it as an encoded query parameter.
+- deepidv redirects the user back with `session_id`, `status`, and optional `reason`.
 
-| Field                     | Type    | Required | Default | Description                                             |
-| ------------------------- | ------- | -------- | ------- | ------------------------------------------------------- |
-| `document.image`          | string  | Yes      | None    | Base64-encoded document image                           |
-| `document.type`           | string  | No       | `auto`  | `passport`, `drivers_license`, `national_id`, or `auto` |
-| `selfie`                  | string  | Yes      | None    | Base64-encoded selfie image                             |
-| `options.extract_data`    | boolean | No       | `true`  | Extract machine-readable identity fields                |
-| `options.match_threshold` | integer | No       | `80`    | Minimum acceptable face-match score                     |
+Redirect status values:
+
+- `success`
+- `failed`
+- `abandoned`
+
+Published redirect reason values:
+
+- `document_unreadable`
+- `face_mismatch`
+- `session_expired`
+- `internal_error`
+- `user_cancelled`
+- `unknown`
+
+Error responses:
+
+| Status | Meaning                                                       |
+| ------ | ------------------------------------------------------------- |
+| `400`  | Invalid request body, missing fields, or invalid phone format |
+| `401`  | Missing or invalid API key                                    |
+| `402`  | Insufficient token balance                                    |
+| `404`  | Workflow ID not found                                         |
+| `429`  | Rate limit exceeded                                           |
+
+### 2. List Sessions
+
+`GET /v1/sessions`
+
+Returns a paginated list of verification sessions.
+
+Query parameters:
+
+| Field             | Type    | Required | Default | Description                                                                  |
+| ----------------- | ------- | -------- | ------- | ---------------------------------------------------------------------------- |
+| `limit`           | number  | No       | `50`    | Number of sessions to return, from `1` to `500`                              |
+| `next_token`      | string  | No       | —       | Pagination token from a previous response                                    |
+| `start_date`      | string  | No       | —       | Sessions created on or after this ISO 8601 timestamp                         |
+| `end_date`        | string  | No       | —       | Sessions created on or before this ISO 8601 timestamp                        |
+| `by_organization` | boolean | No       | `false` | Return all organization sessions instead of only those created by the caller |
+| `external_id`     | string  | No       | —       | Filter by caller reference ID                                                |
+| `workflow_id`     | string  | No       | —       | Filter by workflow ID                                                        |
+
+Query evaluation priority:
+
+1. `external_id`
+2. `workflow_id`
+3. `by_organization`
+4. default sender-based query
+
+Example response:
+
+```json
+{
+  "sessions": [
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "organization_id": "org_abc123",
+      "user_id": "usr_def456",
+      "sender_user_id": "usr_ghi789",
+      "status": "VERIFIED",
+      "type": "session",
+      "session_progress": "COMPLETED",
+      "created_at": "2025-01-15T10:30:00.000Z",
+      "updated_at": "2025-01-15T10:45:00.000Z"
+    }
+  ],
+  "next_token": "eyJpZCI6ImFiYzEyMyJ9"
+}
+```
+
+Response fields:
+
+| Field        | Type           | Meaning                                          |
+| ------------ | -------------- | ------------------------------------------------ |
+| `sessions`   | array          | Session objects using the `session_record` shape |
+| `next_token` | string or null | Pagination token for the next page               |
+
+Notes:
+
+- List responses do not include `user`, `sender_user`, or `resource_links`.
+- Continue paginating until `next_token` is `null`.
+
+Error responses:
+
+| Status | Meaning                                                       |
+| ------ | ------------------------------------------------------------- |
+| `400`  | Invalid query parameters, date format, limit, or `next_token` |
+| `401`  | Missing or invalid API key                                    |
+| `429`  | Rate limit exceeded                                           |
+
+### 3. Retrieve Session
+
+`GET /v1/sessions/{id}`
+
+Retrieves the full details of a single verification session by its session ID, including analysis results and presigned URLs for uploaded documents.
+
+Path parameters:
+
+| Field | Type   | Required | Description                               |
+| ----- | ------ | -------- | ----------------------------------------- |
+| `id`  | string | Yes      | Session ID returned from session creation |
+
+Top-level response fields:
+
+| Field            | Type   | Meaning                                     |
+| ---------------- | ------ | ------------------------------------------- |
+| `session_record` | object | Full session object                         |
+| `resource_links` | object | Presigned URLs for uploaded files           |
+| `user`           | object | Applicant profile when available            |
+| `sender_user`    | object | User who created the session when available |
+
+Important `session_record` fields:
+
+| Field              | Type     | Meaning                                                                            |
+| ------------------ | -------- | ---------------------------------------------------------------------------------- |
+| `id`               | string   | Unique session identifier                                                          |
+| `organization_id`  | string   | Owning organization                                                                |
+| `user_id`          | string   | Applicant user ID                                                                  |
+| `sender_user_id`   | string   | Creator user ID                                                                    |
+| `external_id`      | string   | Caller reference ID                                                                |
+| `status`           | string   | `PENDING`, `SUBMITTED`, `VERIFIED`, `REJECTED`, or `VOIDED`                        |
+| `type`             | string   | `session`, `verification`, `credit-application`, `silent-screening`, or `deep-doc` |
+| `session_progress` | string   | `PENDING`, `STARTED`, or `COMPLETED`                                               |
+| `created_at`       | string   | Session creation timestamp                                                         |
+| `updated_at`       | string   | Last update timestamp                                                              |
+| `submitted_at`     | string   | Applicant submission timestamp                                                     |
+| `workflow_id`      | string   | Workflow used by the session                                                       |
+| `workflow_steps`   | string[] | Workflow step IDs                                                                  |
+| `uploads`          | object   | Booleans describing which uploads are present                                      |
+| `analysis_data`    | object   | Verification and screening analysis results                                        |
+| `meta_data`        | object   | Applicant submission metadata                                                      |
+
+Key `analysis_data` fields called out by the docs:
+
+- `id_analysis_data`
+- `id_matches_selfie`
+- `faceliveness_score`
+- `compare_faces_data`
+- `pep_sanctions_data`
+- `adverse_media_data`
+- `secondary_id_analysis_data`
+- `tertiary_id_analysis_data`
+- `selected_document_types`
+- `document_risk_data`
+- `title_search_data`
+- `custom_form_data`
+
+Error responses:
+
+| Status | Meaning                                     |
+| ------ | ------------------------------------------- |
+| `400`  | Invalid session ID format                   |
+| `401`  | Missing or invalid API key                  |
+| `403`  | Session belongs to a different organization |
+| `404`  | Session ID does not exist                   |
+| `429`  | Rate limit exceeded                         |
+
+### 4. Update Session Status
+
+`PATCH /v1/sessions/{id}/update-status`
+
+Manually updates a session to `VERIFIED` or `REJECTED`.
+
+Path parameters:
+
+| Field | Type   | Required | Description                               |
+| ----- | ------ | -------- | ----------------------------------------- |
+| `id`  | string | Yes      | Session ID returned from session creation |
+
+Body parameters:
+
+| Field        | Type   | Required | Description                      |
+| ------------ | ------ | -------- | -------------------------------- |
+| `new_status` | string | Yes      | Must be `VERIFIED` or `REJECTED` |
 
 Example request:
 
 ```json
 {
-  "document": {
-    "image": "<base64_document_image>",
-    "type": "passport"
-  },
-  "selfie": "<base64_selfie>",
-  "options": {
-    "extract_data": true,
-    "match_threshold": 80
-  }
+  "new_status": "VERIFIED"
 }
 ```
 
-Response `result`:
+Success response fields:
 
-| Field                   | Type    | Meaning                             |
-| ----------------------- | ------- | ----------------------------------- |
-| `verified`              | boolean | Primary pass or fail outcome        |
-| `face_match_score`      | integer | Selfie-to-document face match score |
-| `document_type`         | string  | Detected or supplied document type  |
-| `extracted_data`        | object  | Parsed identity fields              |
-| `document_authenticity` | object  | Authenticity checks and confidence  |
+| Field            | Type   | Meaning                |
+| ---------------- | ------ | ---------------------- |
+| `session_record` | object | Updated session object |
 
-### 3. Deepfake Detection
+Error responses:
 
-`POST /v1/verify/deepfake`
+| Status | Meaning                                     |
+| ------ | ------------------------------------------- |
+| `400`  | Invalid session ID or invalid `new_status`  |
+| `401`  | Missing or invalid API key                  |
+| `403`  | Session belongs to a different organization |
+| `404`  | Session ID does not exist                   |
+| `429`  | Rate limit exceeded                         |
 
-Use this endpoint when the media itself needs authenticity analysis.
+## Workflows
 
-Request body:
+### 5. List Workflows
 
-| Field                       | Type    | Required | Default | Description                   |
-| --------------------------- | ------- | -------- | ------- | ----------------------------- |
-| `media`                     | string  | Yes      | None    | Base64-encoded image or video |
-| `media_type`                | string  | Yes      | None    | `image` or `video`            |
-| `options.detailed_analysis` | boolean | No       | `false` | Include artifact-level detail |
+`GET /v1/workflows`
 
-Example request:
+Returns all workflows for the organization, sorted by creation date with the newest first.
+
+Success response:
 
 ```json
 {
-  "media": "<base64_media>",
-  "media_type": "image",
-  "options": {
-    "detailed_analysis": true
-  }
+  "workflows": [
+    {
+      "id": "6d6da499-9225-40fb-9ffd-a06634b915bd",
+      "name": "Full Verification",
+      "created_at": "2026-03-01T17:30:24.573Z"
+    },
+    {
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "Basic ID Check",
+      "created_at": "2026-02-15T09:30:00.000Z"
+    }
+  ]
 }
 ```
 
-Response `result`:
+Response fields:
 
-| Field                  | Type           | Meaning                                                                          |
-| ---------------------- | -------------- | -------------------------------------------------------------------------------- |
-| `is_deepfake`          | boolean        | Whether manipulation is likely present                                           |
-| `deepfake_probability` | integer        | Probability score from `0` to `100`                                              |
-| `manipulation_type`    | string or null | `face_swap`, `full_synthetic`, `audio_deepfake`, `partial_manipulation`, or null |
-| `artifact_analysis`    | object         | Detailed anomaly indicators                                                      |
+| Field                    | Type   | Meaning                  |
+| ------------------------ | ------ | ------------------------ |
+| `workflows`              | array  | Workflow summary objects |
+| `workflows[].id`         | string | Workflow identifier      |
+| `workflows[].name`       | string | Workflow name            |
+| `workflows[].created_at` | string | Creation timestamp       |
 
-### 4. Adverse Media Screening
+Error responses:
 
-`POST /v1/screen/adverse-media`
+| Status | Meaning                    |
+| ------ | -------------------------- |
+| `401`  | Missing or invalid API key |
+| `429`  | Rate limit exceeded        |
 
-Use this endpoint when public reporting and reputational risk must be reviewed.
+### 6. Retrieve Workflow
 
-Request body:
+`GET /v1/workflows/{id}`
 
-| Field                   | Type    | Required | Default | Description                                                                     |
-| ----------------------- | ------- | -------- | ------- | ------------------------------------------------------------------------------- |
-| `name`                  | string  | Yes      | None    | Person or entity name                                                           |
-| `date_of_birth`         | string  | No       | None    | ISO `YYYY-MM-DD` date                                                           |
-| `nationality`           | string  | No       | None    | ISO 3166-1 alpha-2 code                                                         |
-| `options.categories`    | array   | No       | all     | Categories such as `fraud`, `terrorism`, `financial_crime`, `sanctions_evasion` |
-| `options.date_range`    | string  | No       | `5y`    | `1y`, `3y`, `5y`, `10y`, or `all`                                               |
-| `options.min_relevance` | integer | No       | `70`    | Minimum relevance score                                                         |
+Returns the full workflow record for the given ID.
 
-Example request:
+Path parameters:
 
-```json
-{
-  "name": "Jane Doe",
-  "date_of_birth": "1990-05-15",
-  "nationality": "CA",
-  "options": {
-    "categories": ["fraud", "financial_crime"],
-    "date_range": "5y",
-    "min_relevance": 70
-  }
-}
-```
+| Field | Type   | Required | Description |
+| ----- | ------ | -------- | ----------- |
+| `id`  | string | Yes      | Workflow ID |
 
-Response `result`:
+Response fields:
 
-| Field              | Type    | Meaning                              |
-| ------------------ | ------- | ------------------------------------ |
-| `hits`             | integer | Number of adverse media matches      |
-| `matches`          | array   | Matching articles and public records |
-| `screened_sources` | integer | Number of sources checked            |
+| Field                      | Type   | Meaning                            |
+| -------------------------- | ------ | ---------------------------------- |
+| `workflow`                 | object | Workflow record                    |
+| `workflow.id`              | string | Workflow identifier                |
+| `workflow.name`            | string | Workflow name                      |
+| `workflow.organization_id` | string | Owning organization                |
+| `workflow.status`          | string | `active` or `inactive`             |
+| `workflow.created_at`      | string | Creation timestamp                 |
+| `workflow.updated_at`      | string | Last update timestamp              |
+| `workflow.steps`           | array  | Ordered list of verification steps |
+| `workflow.steps[].id`      | string | Step identifier                    |
+| `workflow.steps[].config`  | object | Step configuration                 |
 
-### 5. AML and Sanctions Screening
+Example step IDs shown on the docs site:
 
-`POST /v1/screen/aml`
+- `id-verification`
+- `face-liveness`
+- `age-estimation`
+- `pep-sanctions`
+- `adverse-media`
+- `bank-statement-upload`
+- `document-upload`
+- `title-search`
+- `custom-prompt`
+- `custom-form`
+- `ai-bank-statement-analysis`
 
-Use this endpoint for sanctions, PEP, and watchlist checks.
+Operational note from the docs:
 
-Request body:
+- To list sessions for a workflow, call `GET /v1/sessions` with `workflow_id`.
 
-| Field                        | Type    | Required | Default | Description                             |
-| ---------------------------- | ------- | -------- | ------- | --------------------------------------- |
-| `name`                       | string  | Yes      | None    | Person or entity name                   |
-| `date_of_birth`              | string  | No       | None    | ISO `YYYY-MM-DD` date                   |
-| `nationality`                | string  | No       | None    | ISO 3166-1 alpha-2 code                 |
-| `screening_types`            | array   | No       | all     | Any of `sanctions`, `pep`, `watchlists` |
-| `options.fuzzy_threshold`    | integer | No       | `85`    | Minimum fuzzy-match score               |
-| `options.include_associates` | boolean | No       | `false` | Include known associates                |
+Error responses:
 
-Example request:
-
-```json
-{
-  "name": "Jane Doe",
-  "date_of_birth": "1990-05-15",
-  "nationality": "CA",
-  "screening_types": ["sanctions", "pep"],
-  "options": {
-    "fuzzy_threshold": 85,
-    "include_associates": false
-  }
-}
-```
-
-Response `result`:
-
-| Field                | Type           | Meaning                     |
-| -------------------- | -------------- | --------------------------- |
-| `hits`               | integer        | Number of watchlist matches |
-| `matches`            | array          | Matching watchlist records  |
-| `lists_checked`      | integer        | Number of lists queried     |
-| `pep_classification` | string or null | PEP type when applicable    |
-
-### 6. Combined Verification
-
-`POST /v1/verify/full`
-
-Use this endpoint when a caller wants a complete verification workflow in one request.
-
-Request body:
-
-| Field                     | Type   | Required | Default    | Description                   |
-| ------------------------- | ------ | -------- | ---------- | ----------------------------- |
-| `document.image`          | string | Yes      | None       | Base64-encoded document image |
-| `document.type`           | string | No       | `auto`     | Document type override        |
-| `selfie`                  | string | Yes      | None       | Base64-encoded selfie         |
-| `screening.name`          | string | Yes      | None       | Name used for screening       |
-| `screening.date_of_birth` | string | No       | None       | ISO `YYYY-MM-DD` date         |
-| `screening.nationality`   | string | No       | None       | ISO 3166-1 alpha-2 code       |
-| `options.skip`            | array  | No       | `[]`       | Optional checks to skip       |
-| `options.strictness`      | string | No       | `standard` | Liveness strictness profile   |
-
-Example request:
-
-```json
-{
-  "document": {
-    "image": "<base64_document_image>",
-    "type": "passport"
-  },
-  "selfie": "<base64_selfie>",
-  "screening": {
-    "name": "Jane Doe",
-    "date_of_birth": "1990-05-15",
-    "nationality": "CA"
-  },
-  "options": {
-    "skip": [],
-    "strictness": "standard"
-  }
-}
-```
-
-Response `result`:
-
-| Field              | Type   | Meaning                             |
-| ------------------ | ------ | ----------------------------------- |
-| `overall_decision` | string | `approved`, `review`, or `rejected` |
-| `liveness`         | object | Liveness sub-result                 |
-| `identity`         | object | Identity sub-result                 |
-| `deepfake`         | object | Deepfake sub-result                 |
-| `adverse_media`    | object | Adverse media sub-result            |
-| `aml`              | object | AML and sanctions sub-result        |
-
-## Notes for Safe Clients
-
-- Always send JSON request bodies.
-- Reuse `X-Request-ID` only when intentionally retrying the same logical request.
-- Treat `pending` as non-final and wait for downstream orchestration to finish.
-- Surface `request_id` in logs and support tickets.
+| Status | Meaning                                      |
+| ------ | -------------------------------------------- |
+| `401`  | Missing or invalid API key                   |
+| `403`  | Workflow belongs to a different organization |
+| `404`  | No workflow found with the given ID          |
+| `429`  | Rate limit exceeded                          |

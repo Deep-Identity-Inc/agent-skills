@@ -4,24 +4,28 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-DEFAULT_PRODUCTION_URL="https://api.deepidv.com/v1"
-DEFAULT_SANDBOX_URL="https://sandbox.api.deepidv.com/v1"
+DEFAULT_BASE_URL="https://api.deepidv.com/v1"
 
 usage() {
   cat <<'EOF'
-Usage: ./verify.sh <endpoint> [json_body_file]
+Usage:
+  ./verify.sh create-session [json_body_file]
+  ./verify.sh list-sessions [query_string]
+  ./verify.sh get-session <session_id>
+  ./verify.sh update-session-status <session_id> [json_body_file]
+  ./verify.sh list-workflows
+  ./verify.sh get-workflow <workflow_id>
 
-Endpoints:
-  liveness        POST /v1/verify/liveness
-  identity        POST /v1/verify/identity
-  deepfake        POST /v1/verify/deepfake
-  adverse-media   POST /v1/screen/adverse-media
-  aml             POST /v1/screen/aml
-  full            POST /v1/verify/full
+Commands:
+  create-session         POST /v1/sessions
+  list-sessions          GET /v1/sessions
+  get-session            GET /v1/sessions/{id}
+  update-session-status  PATCH /v1/sessions/{id}/update-status
+  list-workflows         GET /v1/workflows
+  get-workflow           GET /v1/workflows/{id}
 
 Environment:
   DEEPIDV_API_KEY   API key override.
-  DEEPIDV_ENV       sandbox or production. Defaults to production.
   DEEPIDV_BASE_URL  Explicit base URL override.
 
 Credential fallback files:
@@ -29,9 +33,12 @@ Credential fallback files:
   ~/.deepidv/credentials in the user home directory
 
 Examples:
-  DEEPIDV_ENV=sandbox ./verify.sh liveness request.json
-  ./verify.sh aml screening.json
-  cat request.json | ./verify.sh full
+  ./verify.sh create-session request.json
+  ./verify.sh list-sessions "limit=25&workflow_id=wf_abc123"
+  ./verify.sh get-session a1b2c3d4-e5f6-7890-abcd-ef1234567890
+  ./verify.sh update-session-status a1b2c3d4-e5f6-7890-abcd-ef1234567890 status.json
+  ./verify.sh list-workflows
+  ./verify.sh get-workflow 6d6da499-9225-40fb-9ffd-a06634b915bd
 EOF
 }
 
@@ -96,18 +103,28 @@ resolve_base_url() {
     return 0
   fi
 
-  case "${DEEPIDV_ENV:-production}" in
-    production)
-      printf '%s\n' "$DEFAULT_PRODUCTION_URL"
-      ;;
-    sandbox)
-      printf '%s\n' "$DEFAULT_SANDBOX_URL"
-      ;;
-    *)
-      echo "Error: DEEPIDV_ENV must be 'production' or 'sandbox'." >&2
+  printf '%s\n' "$DEFAULT_BASE_URL"
+}
+
+build_body_arg() {
+  local body_file="${1:-}"
+
+  if [[ -n "$body_file" ]]; then
+    if [[ ! -f "$body_file" ]]; then
+      echo "Error: JSON body file '$body_file' was not found." >&2
       exit 1
-      ;;
-  esac
+    fi
+    BODY_ARG=(--data "@$body_file")
+    return 0
+  fi
+
+  if [[ -t 0 ]]; then
+    echo "Error: provide a JSON body file or pipe JSON on stdin." >&2
+    usage >&2
+    exit 1
+  fi
+
+  BODY_ARG=(--data @-)
 }
 
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || -z "${1:-}" ]]; then
@@ -115,33 +132,9 @@ if [[ "${1:-}" == "-h" || "${1:-}" == "--help" || -z "${1:-}" ]]; then
   [[ -z "${1:-}" ]] && exit 1 || exit 0
 fi
 
-ENDPOINT="$1"
-BODY_FILE="${2:-}"
-case "$ENDPOINT" in
-  liveness)
-    URL_PATH="/verify/liveness"
-    ;;
-  identity)
-    URL_PATH="/verify/identity"
-    ;;
-  deepfake)
-    URL_PATH="/verify/deepfake"
-    ;;
-  adverse-media)
-    URL_PATH="/screen/adverse-media"
-    ;;
-  aml)
-    URL_PATH="/screen/aml"
-    ;;
-  full)
-    URL_PATH="/verify/full"
-    ;;
-  *)
-    echo "Error: invalid endpoint alias '$ENDPOINT'." >&2
-    usage >&2
-    exit 1
-    ;;
-esac
+COMMAND="$1"
+ARG_ONE="${2:-}"
+ARG_TWO="${3:-}"
 
 API_KEY="$(load_api_key || true)"
 
@@ -152,26 +145,76 @@ if [[ -z "$API_KEY" ]]; then
 fi
 
 BASE_URL="$(resolve_base_url)"
+BODY_ARG=()
+METHOD="GET"
+URL_PATH=""
+CONTENT_TYPE=false
+
+case "$COMMAND" in
+  create-session)
+    METHOD="POST"
+    URL_PATH="/sessions"
+    CONTENT_TYPE=true
+    build_body_arg "$ARG_ONE"
+    ;;
+  list-sessions)
+    URL_PATH="/sessions"
+    if [[ -n "$ARG_ONE" ]]; then
+      URL_PATH+="?$ARG_ONE"
+    fi
+    ;;
+  get-session)
+    if [[ -z "$ARG_ONE" ]]; then
+      echo "Error: get-session requires a session ID." >&2
+      usage >&2
+      exit 1
+    fi
+    URL_PATH="/sessions/$ARG_ONE"
+    ;;
+  update-session-status)
+    if [[ -z "$ARG_ONE" ]]; then
+      echo "Error: update-session-status requires a session ID." >&2
+      usage >&2
+      exit 1
+    fi
+    METHOD="PATCH"
+    URL_PATH="/sessions/$ARG_ONE/update-status"
+    CONTENT_TYPE=true
+    build_body_arg "$ARG_TWO"
+    ;;
+  list-workflows)
+    URL_PATH="/workflows"
+    ;;
+  get-workflow)
+    if [[ -z "$ARG_ONE" ]]; then
+      echo "Error: get-workflow requires a workflow ID." >&2
+      usage >&2
+      exit 1
+    fi
+    URL_PATH="/workflows/$ARG_ONE"
+    ;;
+  *)
+    echo "Error: invalid command '$COMMAND'." >&2
+    usage >&2
+    exit 1
+    ;;
+esac
+
 URL="$BASE_URL$URL_PATH"
 
-REQUEST_ID="$(uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || date +%s)"
+CURL_ARGS=(
+  -sS
+  -X "$METHOD"
+  "$URL"
+  -H "x-api-key: $API_KEY"
+)
 
-if [[ -n "$BODY_FILE" ]]; then
-  if [[ ! -f "$BODY_FILE" ]]; then
-    echo "Error: JSON body file '$BODY_FILE' was not found." >&2
-    exit 1
-  fi
-  DATA_ARG=(--data "@$BODY_FILE")
-elif [[ -t 0 ]]; then
-  echo "Error: provide a JSON body file or pipe JSON on stdin." >&2
-  usage >&2
-  exit 1
-else
-  DATA_ARG=(--data @-)
+if [[ "$CONTENT_TYPE" == true ]]; then
+  CURL_ARGS+=( -H "Content-Type: application/json" )
 fi
 
-curl -sS -X POST "$URL" \
-  -H "Content-Type: application/json" \
-  -H "X-DEEPIDV-KEY: $API_KEY" \
-  -H "X-Request-ID: $REQUEST_ID" \
-  "${DATA_ARG[@]}"
+if [[ ${#BODY_ARG[@]} -gt 0 ]]; then
+  CURL_ARGS+=( "${BODY_ARG[@]}" )
+fi
+
+curl "${CURL_ARGS[@]}"

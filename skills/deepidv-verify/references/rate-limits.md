@@ -1,68 +1,39 @@
-# deepidv Rate Limits
+# deepidv Sessions and Workflows Rate-Limit Guidance
 
-This document describes the published rate-limit posture for the public deepidv Verify API and the safe retry behavior expected from clients.
+This document summarizes the rate-limit behavior that is explicitly visible from the deepidv docs pages covering sessions and workflows.
 
-## Published Limits
+## Published Behavior
 
-| Plan            | Requests per Minute | Burst Allowance | Daily Limit |
-| --------------- | ------------------- | --------------- | ----------- |
-| Free or Sandbox | 10                  | 20              | 100         |
-| Starter         | 30                  | 60              | 5000        |
-| Growth          | 100                 | 200             | 50000       |
-| Enterprise      | Custom              | Custom          | Custom      |
+The current docs pages for session and workflow endpoints publish `429 Too Many Requests` as an error response.
 
-Sandbox traffic always uses the Free or Sandbox tier, even if the production account has higher throughput.
+Covered endpoints:
 
-## Response Headers
+- `POST /v1/sessions`
+- `GET /v1/sessions`
+- `GET /v1/sessions/{id}`
+- `PATCH /v1/sessions/{id}/update-status`
+- `GET /v1/workflows`
+- `GET /v1/workflows/{id}`
 
-| Header                  | Meaning                                                              |
-| ----------------------- | -------------------------------------------------------------------- |
-| `X-RateLimit-Limit`     | Requests allowed in the current minute window                        |
-| `X-RateLimit-Remaining` | Requests remaining in the current minute window                      |
-| `X-RateLimit-Reset`     | Unix timestamp for the next window reset                             |
-| `Retry-After`           | Seconds to wait before retrying after throttling or temporary outage |
+The docs pages do not publish numeric per-minute quotas, burst allowances, or response header contracts for these endpoints. Clients should avoid assuming undocumented limits.
 
 ## Safe Client Expectations
 
-- Treat `429` as a signal to stop sending requests until `Retry-After` has elapsed.
-- Do not fan out retries across parallel workers after throttling.
-- Preserve the same `X-Request-ID` only when retrying the same logical request.
-- Use bounded exponential backoff for `500` and `503` responses.
-- Log `request_id`, `X-RateLimit-Remaining`, and `Retry-After` for operator diagnostics.
+- Treat `429` as a hard stop, not as a prompt to increase retry pressure.
+- Keep session listing paginated and bounded. The documented `limit` range is `1` to `500`, with `50` as the default.
+- Avoid concurrent polling loops that hit the same session or workflow repeatedly.
+- Cache workflow lists and workflow definitions when the same data would otherwise be fetched repeatedly.
+- Use `external_id` and `workflow_id` filters to reduce unnecessary page scans on `GET /v1/sessions`.
 
 ## Recommended Retry Policy
 
-1. If `Retry-After` is present, wait exactly that duration.
-2. If `Retry-After` is missing for a retriable response, wait `1`, `2`, then `4` seconds.
-3. Stop after three retries unless an operator explicitly opts into longer retries.
-4. Do not retry validation or authentication failures.
-
-Example pseudocode:
-
-```python
-import time
-import requests
-
-
-def call_with_retry(url, headers, body, max_retries=3):
-    delay = 1
-    for attempt in range(max_retries + 1):
-        response = requests.post(url, headers=headers, json=body)
-        if response.status_code not in (429, 500, 503):
-            return response
-        retry_after = response.headers.get("Retry-After")
-        wait_seconds = int(retry_after) if retry_after else delay
-        time.sleep(wait_seconds)
-        delay = min(delay * 2, 4)
-    return response
-```
-
-## Endpoint Pooling
-
-All six public Verify endpoints share the same account-level quota pool. There are no endpoint-specific pools for the public skill.
+1. On `429`, wait before retrying and reduce concurrency.
+2. Retry only the specific request that was throttled.
+3. If listing sessions, resume from the last known `next_token` rather than restarting the full scan.
+4. If repeated throttling occurs, lower background polling frequency and cache more aggressively.
 
 ## Operational Advice
 
-- Prefer the combined verification endpoint when a workflow would otherwise issue several back-to-back requests for the same subject.
-- Run load tests only against sandbox and within published sandbox limits.
-- Contact deepidv sales or support before planning throughput above the published tier.
+- Resolve workflow IDs once, then reuse them during session creation.
+- Prefer direct lookups such as `GET /v1/sessions/{id}` or `GET /v1/sessions?external_id=...` over broad list sweeps when you already know the target.
+- If a redirect flow already returned a `session_id`, retrieve that single session instead of polling organization-wide lists.
