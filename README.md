@@ -24,14 +24,12 @@ This repository makes those capabilities accessible to AI agents and brings agen
 
 Any compatible AI agent can load this skill from the repository and immediately call deepidv's verification and screening APIs with no separate integration required. Endpoint routing, authentication, and request formatting are all handled by the skill.
 
-| Capability                  | What it does                                                                            |
-| --------------------------- | --------------------------------------------------------------------------------------- |
-| Face liveness               | Confirms a selfie came from a live person, not a photo or replay attack                 |
-| Identity verification       | Matches a government-issued ID against a selfie and validates the document              |
-| Deepfake detection          | Determines whether an image or video is AI-generated or synthetically manipulated       |
-| Adverse media screening     | Searches global news and public records for negative risk signals tied to a person      |
-| AML and sanctions screening | Checks a subject against PEP lists, sanctions databases, and financial crime watchlists |
-| Combined verification       | Runs a complete verification and screening flow in a single API call                    |
+- **Face liveness** — Confirms a selfie came from a live person, not a photo or replay attack
+- **Identity verification** — Matches a government-issued ID against a selfie and validates the document
+- **Deepfake detection** — Determines whether an image or video is AI-generated or synthetically manipulated
+- **Adverse media screening** — Searches global news and public records for negative risk signals tied to a person
+- **AML and sanctions screening** — Checks a subject against PEP lists, sanctions databases, and financial crime watchlists
+- **Combined verification** — Runs a complete verification and screening flow in a single API call
 
 Compatible with Claude Code, Codex, Cursor, Windsurf, and OpenCode. Full invocation guidance, endpoint routing, authentication instructions, and worked examples are in [skills/deepidv-verify/SKILL.md](skills/deepidv-verify/SKILL.md).
 
@@ -39,12 +37,10 @@ Compatible with Claude Code, Codex, Cursor, Windsurf, and OpenCode. Full invocat
 
 The MCP server turns deepidv's platform operations into structured tools that AI agents and orchestration frameworks can call directly. Verification workflows, compliance cases, screening history, and platform administration are all reachable over the Model Context Protocol.
 
-| Domain                     | What it covers                                                                                      |
-| -------------------------- | --------------------------------------------------------------------------------------------------- |
-| Verification management    | Retrieve, search, and rerun verifications; access supporting media                                  |
-| Case management            | Create, update, escalate, and resolve compliance cases                                              |
-| Screening and monitoring   | Run screening jobs, review history, manage watchlists, view the compliance dashboard                |
-| Support and administration | Query the knowledge base, track usage, pull audit logs, manage integrations, submit support tickets |
+- **Verification management** — Retrieve, search, and rerun verifications; access supporting media
+- **Case management** — Create, update, escalate, and resolve compliance cases
+- **Screening and monitoring** — Run screening jobs, review history, manage watchlists, view the compliance dashboard
+- **Support and administration** — Query the knowledge base, track usage, pull audit logs, manage integrations, submit support tickets
 
 Built on Node.js and TypeScript with OAuth 2.0 + PKCE authentication. Full architecture detail is in [docs/architecture.md](docs/architecture.md).
 
