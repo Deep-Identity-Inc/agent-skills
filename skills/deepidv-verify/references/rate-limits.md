@@ -12,6 +12,7 @@ Covered endpoints:
 - `GET /v1/sessions`
 - `GET /v1/sessions/{id}`
 - `PATCH /v1/sessions/{id}/update-status`
+- `POST /v1/workflows`
 - `GET /v1/workflows`
 - `GET /v1/workflows/{id}`
 
@@ -23,6 +24,7 @@ The docs pages do not publish numeric per-minute quotas, burst allowances, or re
 - Keep session listing paginated and bounded. The documented `limit` range is `1` to `500`, with `50` as the default.
 - Avoid concurrent polling loops that hit the same session or workflow repeatedly.
 - Cache workflow lists and workflow definitions when the same data would otherwise be fetched repeatedly.
+- Reuse `GET /v1/workflows` results for workflow discovery because list responses include step sequences.
 - Use `external_id` and `workflow_id` filters to reduce unnecessary page scans on `GET /v1/sessions`.
 
 ## Recommended Retry Policy
@@ -36,4 +38,5 @@ The docs pages do not publish numeric per-minute quotas, burst allowances, or re
 
 - Resolve workflow IDs once, then reuse them during session creation.
 - Prefer direct lookups such as `GET /v1/sessions/{id}` or `GET /v1/sessions?external_id=...` over broad list sweeps when you already know the target.
+- Prefer `GET /v1/workflows/{id}` only when you need fully resolved step configuration beyond the list response.
 - If a redirect flow already returned a `session_id`, retrieve that single session instead of polling organization-wide lists.

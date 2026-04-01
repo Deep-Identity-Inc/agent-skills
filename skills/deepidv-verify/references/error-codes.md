@@ -10,6 +10,7 @@ Covered endpoints:
 - `GET /v1/sessions`
 - `GET /v1/sessions/{id}`
 - `PATCH /v1/sessions/{id}/update-status`
+- `POST /v1/workflows`
 - `GET /v1/workflows`
 - `GET /v1/workflows/{id}`
 
@@ -17,14 +18,14 @@ The docs pages do not currently publish application-specific error codes for the
 
 ## HTTP Failure Classes
 
-| Status | Class            | Meaning                                                               | Operator Action                         |
-| ------ | ---------------- | --------------------------------------------------------------------- | --------------------------------------- |
-| `400`  | Validation       | Request parameters, path values, or body fields are invalid           | Correct the request before retrying     |
-| `401`  | Authentication   | API key is missing or invalid                                         | Fix credentials before retrying         |
-| `402`  | Balance          | The account has insufficient token balance for session creation       | Replenish balance before retrying       |
-| `403`  | Authorization    | The requested session or workflow belongs to a different organization | Use the correct organization context    |
-| `404`  | Missing Resource | The supplied workflow or session ID does not exist                    | Re-check the identifier before retrying |
-| `429`  | Rate Limit       | Too many requests were sent                                           | Back off and retry conservatively       |
+| Status | Class            | Meaning                                                           | Operator Action                         |
+| ------ | ---------------- | ----------------------------------------------------------------- | --------------------------------------- |
+| `400`  | Validation       | Request parameters, path values, or body fields are invalid       | Correct the request before retrying     |
+| `401`  | Authentication   | API key is missing or invalid                                     | Fix credentials before retrying         |
+| `402`  | Balance          | The account has insufficient token balance for session creation   | Replenish balance before retrying       |
+| `403`  | Authorization    | The key cannot perform the requested operation or resource access | Use the correct organization context    |
+| `404`  | Missing Resource | The supplied workflow or session ID does not exist                | Re-check the identifier before retrying |
+| `429`  | Rate Limit       | Too many requests were sent                                       | Back off and retry conservatively       |
 
 ## Endpoint-Specific Guidance
 
@@ -74,9 +75,29 @@ The docs pages do not currently publish application-specific error codes for the
 | `404`  | Session ID not found                           | Confirm the session exists            |
 | `429`  | Request rate too high                          | Retry later                           |
 
-### Workflows
+### Create Workflow
 
-`GET /v1/workflows` and `GET /v1/workflows/{id}`
+`POST /v1/workflows`
+
+| Status | Likely Cause                                                              | Operator Action                         |
+| ------ | ------------------------------------------------------------------------- | --------------------------------------- |
+| `400`  | Missing workflow name, invalid step ID, invalid config, or duplicate step | Correct the request body and retry      |
+| `401`  | API key missing or invalid                                                | Fix `x-api-key`                         |
+| `403`  | Sandbox API key used for workflow creation                                | Retry with a production-capable API key |
+| `429`  | Request rate too high                                                     | Retry later                             |
+
+### List Workflows
+
+`GET /v1/workflows`
+
+| Status | Likely Cause               | Operator Action |
+| ------ | -------------------------- | --------------- |
+| `401`  | API key missing or invalid | Fix `x-api-key` |
+| `429`  | Request rate too high      | Retry later     |
+
+### Retrieve Workflow
+
+`GET /v1/workflows/{id}`
 
 | Status | Likely Cause                             | Operator Action                       |
 | ------ | ---------------------------------------- | ------------------------------------- |
@@ -90,4 +111,5 @@ The docs pages do not currently publish application-specific error codes for the
 - Do not blindly retry `400`, `401`, `402`, `403`, or `404` responses.
 - Retry `429` only after reducing request frequency.
 - Prefer `GET /v1/workflows` before session creation when a workflow ID may be stale or unknown.
+- Use `POST /v1/workflows` only with a production-capable key because sandbox keys are rejected.
 - Prefer `GET /v1/sessions?external_id=...` when you have a caller reference and need to recover a lost session ID.

@@ -13,6 +13,7 @@ Usage:
   ./verify.sh list-sessions [query_string]
   ./verify.sh get-session <session_id>
   ./verify.sh update-session-status <session_id> [json_body_file]
+  ./verify.sh create-workflow [json_body_file]
   ./verify.sh list-workflows
   ./verify.sh get-workflow <workflow_id>
 
@@ -21,6 +22,7 @@ Commands:
   list-sessions          GET /v1/sessions
   get-session            GET /v1/sessions/{id}
   update-session-status  PATCH /v1/sessions/{id}/update-status
+  create-workflow        POST /v1/workflows
   list-workflows         GET /v1/workflows
   get-workflow           GET /v1/workflows/{id}
 
@@ -37,9 +39,27 @@ Examples:
   ./verify.sh list-sessions "limit=25&workflow_id=wf_abc123"
   ./verify.sh get-session a1b2c3d4-e5f6-7890-abcd-ef1234567890
   ./verify.sh update-session-status a1b2c3d4-e5f6-7890-abcd-ef1234567890 status.json
+  ./verify.sh create-workflow workflow.json
   ./verify.sh list-workflows
   ./verify.sh get-workflow 6d6da499-9225-40fb-9ffd-a06634b915bd
 EOF
+}
+
+validate_uuid() {
+  local id="$1"
+  local label="$2"
+  if [[ ! "$id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]]; then
+    echo "Error: ${label} '${id}' is not a valid UUID." >&2
+    exit 1
+  fi
+}
+
+validate_query_string() {
+  local qs="$1"
+  if [[ "$qs" =~ [^a-zA-Z0-9_=\&.:%+@/\-] ]]; then
+    echo "Error: query string contains unexpected characters." >&2
+    exit 1
+  fi
 }
 
 read_credential_file() {
@@ -99,6 +119,10 @@ load_api_key() {
 
 resolve_base_url() {
   if [[ -n "${DEEPIDV_BASE_URL:-}" ]]; then
+    if [[ "$DEEPIDV_BASE_URL" != https://* ]]; then
+      echo "Error: DEEPIDV_BASE_URL must use HTTPS to protect the API key in transit." >&2
+      exit 1
+    fi
     printf '%s\n' "$DEEPIDV_BASE_URL"
     return 0
   fi
@@ -160,6 +184,7 @@ case "$COMMAND" in
   list-sessions)
     URL_PATH="/sessions"
     if [[ -n "$ARG_ONE" ]]; then
+      validate_query_string "$ARG_ONE"
       URL_PATH+="?$ARG_ONE"
     fi
     ;;
@@ -169,6 +194,7 @@ case "$COMMAND" in
       usage >&2
       exit 1
     fi
+    validate_uuid "$ARG_ONE" "session ID"
     URL_PATH="/sessions/$ARG_ONE"
     ;;
   update-session-status)
@@ -177,10 +203,17 @@ case "$COMMAND" in
       usage >&2
       exit 1
     fi
+    validate_uuid "$ARG_ONE" "session ID"
     METHOD="PATCH"
     URL_PATH="/sessions/$ARG_ONE/update-status"
     CONTENT_TYPE=true
     build_body_arg "$ARG_TWO"
+    ;;
+  create-workflow)
+    METHOD="POST"
+    URL_PATH="/workflows"
+    CONTENT_TYPE=true
+    build_body_arg "$ARG_ONE"
     ;;
   list-workflows)
     URL_PATH="/workflows"
@@ -191,6 +224,7 @@ case "$COMMAND" in
       usage >&2
       exit 1
     fi
+    validate_uuid "$ARG_ONE" "workflow ID"
     URL_PATH="/workflows/$ARG_ONE"
     ;;
   *)
@@ -204,6 +238,7 @@ URL="$BASE_URL$URL_PATH"
 
 CURL_ARGS=(
   -sS
+  --fail-with-body
   -X "$METHOD"
   "$URL"
   -H "x-api-key: $API_KEY"
