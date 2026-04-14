@@ -35,14 +35,18 @@ Compatible with Claude Code, Codex, Cursor, Windsurf, and OpenCode. Full invocat
 
 ### MCP Server
 
-The MCP server turns deepidv's platform operations into structured tools that AI agents and orchestration frameworks can call directly. Verification workflows, compliance cases, screening history, and platform administration are all reachable over the Model Context Protocol.
+The MCP server exposes hosted DeepIDV platform operations as structured tools that MCP-compatible clients can call directly. It is available at `https://mcp.deepidv.com` and supports remote OAuth-based access.
 
-- **Verification management** — Retrieve, search, and rerun verifications; access supporting media
-- **Case management** — Create, update, escalate, and resolve compliance cases
-- **Screening and monitoring** — Run screening jobs, review history, manage watchlists, view the compliance dashboard
-- **Support and administration** — Query the knowledge base, track usage, pull audit logs, manage integrations, submit support tickets
+- **Verification sessions** — List sessions, inspect full session details, retrieve artifacts, create new verification sessions, and update session status
+- **Workflows** — List workflows, inspect workflow definitions, and create reusable workflows
+- **Financial requests** — List bank statements, retrieve bank statement details, query by external ID, and create bank statement requests
 
-Built on Node.js and TypeScript with OAuth 2.0 + PKCE authentication. Full architecture detail is in [docs/architecture.md](docs/architecture.md).
+Access requires DeepIDV OAuth credentials:
+
+- `client_id` — the DeepIDV user ID
+- `client_secret` — an active API key owned by that same user
+
+Setup and usage docs are in [mcp-server/README.md](mcp-server/README.md) and [mcp-server/llms-install.md](mcp-server/llms-install.md).
 
 ### deepAI Assistant Skill
 
