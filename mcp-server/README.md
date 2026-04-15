@@ -14,14 +14,13 @@ Hosted MCP access to DeepIDV verification, workflow, and financial tools.
 
 Use the hosted MCP endpoint:
 
-```text
 Server URL: https://mcp.deepidv.com
 
 Example prompts after installation:
+
 - List my latest verification sessions.
 - Show the artifacts for verification session <session_id>.
 - Create a workflow named "Standard KYC" with ID verification and face liveness.
-```
 
 If your MCP client supports remote HTTP servers with OAuth, adding the URL lets the client discover the DeepIDV OAuth metadata automatically.
 
