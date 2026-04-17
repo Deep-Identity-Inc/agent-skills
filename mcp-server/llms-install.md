@@ -4,7 +4,7 @@ Use this file when you are installing the DeepIDV MCP server for a user from thi
 
 ## Goal
 
-Connect the user to the hosted DeepIDV MCP server at `https://mcp.deepidv.com`.
+Connect the user to the hosted DeepIDV MCP server at `https://mcp.deepidv.com/v1/mcp`.
 
 Do not build or run a local server from this repository for normal setup. This MCP server is already hosted by DeepIDV.
 
@@ -15,15 +15,15 @@ Client credentials are mandatory for access.
 | Setting                | Value                                  |
 | ---------------------- | -------------------------------------- |
 | Transport              | Remote MCP over HTTP                   |
-| Server URL             | `https://mcp.deepidv.com`              |
+| Server URL             | `https://mcp.deepidv.com/v1/mcp`       |
 | Auth                   | OAuth 2.0 authorization code with PKCE |
 | Local runtime required | No                                     |
 
 ## Installation Procedure
 
 1. Add a new remote MCP server in the user's client.
-2. Use `https://mcp.deepidv.com` as the exact server URL.
-3. Do not append `/mcp` or any other path.
+2. Use `https://mcp.deepidv.com/v1/mcp` as the exact server URL.
+3. Do not use the bare host without the `/v1/mcp` path.
 4. Enter the required OAuth credentials:
    - `client_id`: the user's DeepIDV user ID
    - `client_secret`: any active DeepIDV API key owned by that same user

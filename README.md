@@ -35,7 +35,7 @@ Compatible with Claude Code, Codex, Cursor, Windsurf, and OpenCode. Full invocat
 
 ### MCP Server
 
-The MCP server exposes hosted DeepIDV platform operations as structured tools that MCP-compatible clients can call directly. It is available at `https://mcp.deepidv.com` and supports remote OAuth-based access.
+The MCP server exposes hosted DeepIDV platform operations as structured tools that MCP-compatible clients can call directly. It is available at `https://mcp.deepidv.com/v1/mcp` and supports remote OAuth-based access.
 
 - **Verification sessions** — List sessions, inspect full session details, retrieve artifacts, create new verification sessions, and update session status
 - **Workflows** — List workflows, inspect workflow definitions, and create reusable workflows

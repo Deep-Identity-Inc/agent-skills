@@ -14,7 +14,7 @@ Hosted MCP access to DeepIDV verification, workflow, and financial tools.
 
 Use the hosted MCP endpoint:
 
-Server URL: https://mcp.deepidv.com
+Server URL: https://mcp.deepidv.com/v1/mcp
 
 Example prompts after installation:
 
@@ -34,7 +34,7 @@ You must also provide DeepIDV OAuth client credentials:
 DeepIDV is a hosted MCP server. You do not need to clone, build, or run a local Node.js process to use it.
 
 1. In your MCP client, add a remote server.
-2. Enter `https://mcp.deepidv.com` as the server URL.
+2. Enter `https://mcp.deepidv.com/v1/mcp` as the server URL.
 3. Enter your required OAuth credentials:
    - `client_id`: your DeepIDV user ID
    - `client_secret`: an active DeepIDV API key owned by that same user
@@ -104,7 +104,7 @@ You need:
 
 ## How It Works
 
-The public endpoint at `https://mcp.deepidv.com` fronts the DeepIDV hosted MCP transport. The server exposes DeepIDV platform operations over streamable HTTP and uses the same core verification, workflow, and financial logic that powers the main platform.
+The public endpoint at `https://mcp.deepidv.com/v1/mcp` fronts the DeepIDV hosted MCP transport. The server exposes DeepIDV platform operations over streamable HTTP and uses the same core verification, workflow, and financial logic that powers the main platform.
 
 For users, the important detail is simpler: connect once, authorize once, and then call DeepIDV operations as MCP tools from your preferred client.
 
