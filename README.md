@@ -1,8 +1,8 @@
 <div align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/deepidv-logo-white.png" />
-    <source media="(prefers-color-scheme: light)" srcset="assets/deepidv-logo-black.png" />
-    <img src="assets/deepidv-logo-black.png" alt="deepidv" width="220" />
+    <source media="(prefers-color-scheme: dark)" srcset="assets/deepidv-light.svg" />
+    <source media="(prefers-color-scheme: light)" srcset="assets/deepidv-dark.svg" />
+    <img src="assets/deepidv-dark.svg" alt="deepidv" width="220" />
   </picture>
 </div>
 
