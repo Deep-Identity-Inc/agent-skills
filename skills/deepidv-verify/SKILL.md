@@ -48,15 +48,19 @@ Agents can discover this skill directly from this repository.
 
 Choose the endpoint that matches the user intent directly:
 
-| User Intent                                                               | Endpoint                                |
-| ------------------------------------------------------------------------- | --------------------------------------- |
-| Start a new applicant verification flow                                   | `POST /v1/sessions`                     |
-| Find existing sessions by creator, organization, workflow, or external ID | `GET /v1/sessions`                      |
-| Inspect the full outcome of one verification session                      | `GET /v1/sessions/{id}`                 |
-| Manually resolve a session as approved or rejected                        | `PATCH /v1/sessions/{id}/update-status` |
-| Create a new basic workflow for later session launches                    | `POST /v1/workflows`                    |
-| Discover which workflows are available and which steps they include       | `GET /v1/workflows`                     |
-| Inspect the exact steps configured in one workflow                        | `GET /v1/workflows/{id}`                |
+| User Intent                                                               | Endpoint                                  |
+| ------------------------------------------------------------------------- | ----------------------------------------- |
+| Start a new applicant verification flow                                   | `POST /v1/sessions`                       |
+| Find existing sessions by creator, organization, workflow, or external ID | `GET /v1/sessions`                        |
+| Inspect the full outcome of one verification session                      | `GET /v1/sessions/{id}`                   |
+| Manually resolve a session as approved or rejected                        | `PATCH /v1/sessions/{id}/update-status`   |
+| Create a new basic workflow for later session launches                    | `POST /v1/workflows`                      |
+| Discover which workflows are available and which steps they include       | `GET /v1/workflows`                       |
+| Inspect the exact steps configured in one workflow                        | `GET /v1/workflows/{id}`                  |
+| Run a synchronous PEP and sanctions screening                             | `POST /v1/screening/pep-sanctions`        |
+| Run a synchronous title or ownership search                               | `POST /v1/screening/title-check`          |
+| Queue an asynchronous adverse-media screening                             | `POST /v1/screening/adverse-media`        |
+| Poll an adverse-media job until it completes                              | `GET /v1/async-jobs/{jobId}`              |
 
 Do not ask the user to choose an endpoint if the request already implies the right operation.
 
@@ -83,6 +87,11 @@ x-api-key: <api_key>
 ```
 
 Never commit keys to the repository. Use sandbox keys for testing and live keys for production traffic.
+
+This skill uses the public REST API directly. It does not use the hosted MCP
+OAuth flow documented elsewhere in this repository. For MCP setup, use the
+`mcp-server/` docs instead of adding Bearer-token or OAuth behavior to this
+skill's request logic.
 
 ## Base URL
 
@@ -130,15 +139,19 @@ List and retrieve endpoints require the `x-api-key` header and do not require a 
 
 ### Endpoint Summary
 
-| Operation             | Endpoint                                | Use When                                                               | Required Inputs                             | High-Value Response Fields                                      |
-| --------------------- | --------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------------- |
-| Create Session        | `POST /v1/sessions`                     | You need to start a verification flow for an applicant                 | `first_name`, `last_name`, `email`, `phone` | `id`, `session_url`, `externalId`, `links`                      |
-| List Sessions         | `GET /v1/sessions`                      | You need to find prior sessions or paginate operational queues         | none                                        | `sessions`, `next_token`                                        |
-| Retrieve Session      | `GET /v1/sessions/{id}`                 | You need detailed status, uploads, or analysis results                 | path `id`                                   | `session_record`, `resource_links`, `user`, `sender_user`       |
-| Update Session Status | `PATCH /v1/sessions/{id}/update-status` | Manual review has reached a final decision                             | path `id`, body `new_status`                | `session_record.status`, `session_record.updated_at`            |
-| Create Workflow       | `POST /v1/workflows`                    | You need to provision a new basic workflow for future session launches | body `name`, body `steps`                   | `workflow.id`, `workflow.status`, `workflow.steps`              |
-| List Workflows        | `GET /v1/workflows`                     | You need to discover available workflow IDs and their ordered steps    | none                                        | `workflows[].id`, `workflows[].name`, `workflows[].steps`       |
-| Retrieve Workflow     | `GET /v1/workflows/{id}`                | You need exact workflow steps and resolved configuration               | path `id`                                   | `workflow.steps`, `workflow.status`, `workflow.organization_id` |
+| Operation                | Endpoint                                  | Use When                                                               | Required Inputs                             | High-Value Response Fields                                           |
+| ------------------------ | ----------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------------- | -------------------------------------------------------------------- |
+| Create Session           | `POST /v1/sessions`                       | You need to start a verification flow for an applicant                 | `first_name`, `last_name`, `email`, `phone` | `id`, `session_url`, `externalId`, `links`                           |
+| List Sessions            | `GET /v1/sessions`                        | You need to find prior sessions or paginate operational queues         | none                                        | `sessions`, `next_token`                                             |
+| Retrieve Session         | `GET /v1/sessions/{id}`                   | You need detailed status, uploads, or analysis results                 | path `id`                                   | `session_record`, `resource_links`, `user`, `sender_user`            |
+| Update Session Status    | `PATCH /v1/sessions/{id}/update-status`   | Manual review has reached a final decision                             | path `id`, body `new_status`                | `session_record.status`, `session_record.updated_at`                 |
+| Create Workflow          | `POST /v1/workflows`                      | You need to provision a new basic workflow for future session launches | body `name`, body `steps`                   | `workflow.id`, `workflow.status`, `workflow.steps`                   |
+| List Workflows           | `GET /v1/workflows`                       | You need to discover available workflow IDs and their ordered steps    | none                                        | `workflows[].id`, `workflows[].name`, `workflows[].steps`            |
+| Retrieve Workflow        | `GET /v1/workflows/{id}`                  | You need exact workflow steps and resolved configuration               | path `id`                                   | `workflow.steps`, `workflow.status`, `workflow.organization_id`      |
+| Run PEP & Sanctions      | `POST /v1/screening/pep-sanctions`        | You need an immediate PEP and sanctions screening result               | `email`, `firstName`, `lastName`, `dateOfBirth` | `totalMatches`, `peps`, `sanctions`, `both`, `searchedSources`   |
+| Run Title Check          | `POST /v1/screening/title-check`          | You need a synchronous property title or ownership search              | `email`, `firstName`, `lastName`, `address` | `status`, property detail fields, `availableUnits`, `message`        |
+| Queue Adverse Media      | `POST /v1/screening/adverse-media`        | You need an adverse-media screening that may take time to complete     | `email`, `firstName`, `lastName`, `dateOfBirth` | `jobId`, `status`, `message`                                    |
+| Poll Async Job           | `GET /v1/async-jobs/{jobId}`              | You need the result of a queued adverse-media screening                | path `jobId`                                | `status`, `result`, `error`                                          |
 
 ### Create Session
 
@@ -342,6 +355,84 @@ Representative step IDs shown in the docs include:
 - `custom-form`
 - `ai-bank-statement-analysis`
 
+### Run PEP & Sanctions
+
+`POST /v1/screening/pep-sanctions`
+
+Use when the user wants a synchronous PEP and sanctions screening and has the
+subject's identity details available.
+
+Required body fields:
+
+- `email`
+- `firstName`
+- `lastName`
+- `dateOfBirth` in `YYYY-MM-DD` format
+
+High-value response fields:
+
+- `totalMatches`
+- `peps`
+- `sanctions`
+- `both`
+- `searchedSources`
+
+### Run Title Check
+
+`POST /v1/screening/title-check`
+
+Use when the user wants a synchronous property title or ownership lookup for a
+US address.
+
+Required body fields:
+
+- `email`
+- `firstName`
+- `lastName`
+- `address`
+
+Important response rule:
+
+- Branch on the returned `status`.
+- `unsupported_region` is a typed success result, not an exception.
+- `multiple_properties` requires disambiguation before proceeding.
+
+### Queue Adverse Media
+
+`POST /v1/screening/adverse-media`
+
+Use when the user wants adverse-media screening and can tolerate an async flow.
+
+Required body fields:
+
+- `email`
+- `firstName`
+- `lastName`
+- `dateOfBirth`
+
+Optional fields:
+
+- `country`
+
+Important request notes:
+
+- This endpoint returns a job reference, not the completed result.
+- Reusing an `Idempotency-Key` returns the same job instead of creating a duplicate scan.
+- Poll `GET /v1/async-jobs/{jobId}` until the job reaches `ready` or `failed`.
+
+### Get Async Job
+
+`GET /v1/async-jobs/{jobId}`
+
+Use when you need to poll the result of `POST /v1/screening/adverse-media`.
+
+Possible statuses:
+
+- `pending`
+- `processing`
+- `ready`
+- `failed`
+
 ## Workflows
 
 ### Session Creation From Workflow
@@ -356,6 +447,13 @@ Representative step IDs shown in the docs include:
 1. Use `GET /v1/sessions` to find the right session by external ID, workflow ID, creator, or organization scope.
 2. Use `GET /v1/sessions/{id}` to inspect the outcome, uploads, and analysis results.
 3. Use `PATCH /v1/sessions/{id}/update-status` only when a final manual decision must override or complete the session lifecycle.
+
+### Screening Operations
+
+1. Use `POST /v1/screening/pep-sanctions` when a synchronous watchlist result is needed immediately.
+2. Use `POST /v1/screening/title-check` when a synchronous property lookup is needed for a US address.
+3. Use `POST /v1/screening/adverse-media` when a broader adverse-media search is needed and async handling is acceptable.
+4. Use `GET /v1/async-jobs/{jobId}` to poll adverse-media results until the job reaches `ready` or `failed`.
 
 ### Redirect-Based Integrations
 
@@ -375,6 +473,12 @@ Use the HTTP status code together with the endpoint-specific validation rules fr
 | `403`       | Session or workflow access is forbidden for this key    | Use the correct organization context or a non-sandbox key      |
 | `404`       | Session or workflow ID not found                        | Re-check the supplied identifier                               |
 | `429`       | Rate limit exceeded                                     | Wait and retry conservatively                                  |
+
+Screening-specific expectations from the published docs:
+
+- `POST /v1/screening/pep-sanctions` and `POST /v1/screening/title-check` can return `503` when the service cannot complete the request.
+- `POST /v1/screening/adverse-media` returns a queued job reference first; do not treat a `202` or `200` job response as the finished screening result.
+- `POST /v1/screening/title-check` uses typed `status` results such as `unsupported_region` and `not_found` instead of throwing for those normal outcome variants.
 
 Use the detailed error catalog for operation-specific recovery guidance:
 
@@ -401,6 +505,8 @@ Published guidance and client recommendations:
 - Use a production-capable key when creating workflows because sandbox keys are rejected for that endpoint.
 - Use `external_id` consistently so integrations can look sessions up without storing only deepidv IDs.
 - Treat redirect query parameters as a completion signal, then retrieve the session for authoritative analysis details when needed.
+- Use `POST /v1/screening/adverse-media` only when async polling is acceptable in the user flow.
+- For title checks, branch on `status` instead of assuming every non-match is an API error.
 - Surface session IDs in logs and support diagnostics.
 - Do not echo full applicant PII (names, email, phone, document data) back to the user or into logs beyond what is needed to confirm the operation. Summarise outcomes using structured fields such as `status` and `session_progress` rather than reproducing raw session records.
 

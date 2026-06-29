@@ -16,6 +16,10 @@ Usage:
   ./verify.sh create-workflow [json_body_file]
   ./verify.sh list-workflows
   ./verify.sh get-workflow <workflow_id>
+  ./verify.sh pep-sanctions [json_body_file]
+  ./verify.sh title-check [json_body_file]
+  ./verify.sh adverse-media [json_body_file]
+  ./verify.sh get-async-job <job_id>
 
 Commands:
   create-session         POST /v1/sessions
@@ -25,10 +29,15 @@ Commands:
   create-workflow        POST /v1/workflows
   list-workflows         GET /v1/workflows
   get-workflow           GET /v1/workflows/{id}
+  pep-sanctions          POST /v1/screening/pep-sanctions
+  title-check            POST /v1/screening/title-check
+  adverse-media          POST /v1/screening/adverse-media
+  get-async-job          GET /v1/async-jobs/{jobId}
 
 Environment:
-  DEEPIDV_API_KEY   API key override.
-  DEEPIDV_BASE_URL  Explicit base URL override.
+  DEEPIDV_API_KEY          API key override.
+  DEEPIDV_BASE_URL         Explicit base URL override.
+  DEEPIDV_IDEMPOTENCY_KEY  Optional Idempotency-Key for adverse-media requests.
 
 Credential fallback files:
   .deepidv/credentials in the project root
@@ -42,6 +51,10 @@ Examples:
   ./verify.sh create-workflow workflow.json
   ./verify.sh list-workflows
   ./verify.sh get-workflow 6d6da499-9225-40fb-9ffd-a06634b915bd
+  ./verify.sh pep-sanctions pep.json
+  ./verify.sh title-check title.json
+  DEEPIDV_IDEMPOTENCY_KEY=job-123 ./verify.sh adverse-media adverse.json
+  ./verify.sh get-async-job a1b2c3d4-e5f6-7890-abcd-ef1234567890
 EOF
 }
 
@@ -227,6 +240,33 @@ case "$COMMAND" in
     validate_uuid "$ARG_ONE" "workflow ID"
     URL_PATH="/workflows/$ARG_ONE"
     ;;
+  pep-sanctions)
+    METHOD="POST"
+    URL_PATH="/screening/pep-sanctions"
+    CONTENT_TYPE=true
+    build_body_arg "$ARG_ONE"
+    ;;
+  title-check)
+    METHOD="POST"
+    URL_PATH="/screening/title-check"
+    CONTENT_TYPE=true
+    build_body_arg "$ARG_ONE"
+    ;;
+  adverse-media)
+    METHOD="POST"
+    URL_PATH="/screening/adverse-media"
+    CONTENT_TYPE=true
+    build_body_arg "$ARG_ONE"
+    ;;
+  get-async-job)
+    if [[ -z "$ARG_ONE" ]]; then
+      echo "Error: get-async-job requires a job ID." >&2
+      usage >&2
+      exit 1
+    fi
+    validate_uuid "$ARG_ONE" "job ID"
+    URL_PATH="/async-jobs/$ARG_ONE"
+    ;;
   *)
     echo "Error: invalid command '$COMMAND'." >&2
     usage >&2
@@ -246,6 +286,10 @@ CURL_ARGS=(
 
 if [[ "$CONTENT_TYPE" == true ]]; then
   CURL_ARGS+=( -H "Content-Type: application/json" )
+fi
+
+if [[ "$COMMAND" == "adverse-media" && -n "${DEEPIDV_IDEMPOTENCY_KEY:-}" ]]; then
+  CURL_ARGS+=( -H "Idempotency-Key: $DEEPIDV_IDEMPOTENCY_KEY" )
 fi
 
 if [[ ${#BODY_ARG[@]} -gt 0 ]]; then

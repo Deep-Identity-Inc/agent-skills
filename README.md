@@ -37,14 +37,17 @@ Compatible with Claude Code, Codex, Cursor, Windsurf, and OpenCode. Full invocat
 
 The MCP server exposes hosted DeepIDV platform operations as structured tools that MCP-compatible clients can call directly. It is available at `https://mcp.deepidv.com/v1/mcp` and supports remote OAuth-based access.
 
-- **Verification sessions** — List sessions, inspect full session details, retrieve artifacts, create new verification sessions, and update session status
-- **Workflows** — List workflows, inspect workflow definitions, and create reusable workflows
-- **Financial requests** — List bank statements, retrieve bank statement details, query by external ID, and create bank statement requests
+- **Applicants** - Search applicants, inspect profiles, check invitation status, and resend invites
+- **Verification sessions** - List sessions, inspect session details, retrieve artifacts, review timelines, create new verification sessions, expire sessions, and update outcomes
+- **Workflows** - List workflows, inspect workflow definitions, and create reusable workflows
+- **Financial requests** - List bank statements, retrieve bank statement details, view stats, query by external ID, and create bank statement requests
+- **Silent screening** - Run PEP and sanctions checks, title checks, adverse-media screening, and async job polling
 
-Access requires DeepIDV OAuth credentials:
+Hosted MCP access uses a shared public OAuth client:
 
-- `client_id` — the DeepIDV user ID
-- `client_secret` — an active API key owned by that same user
+- `client_id` - `deepidv` if the client explicitly asks for it
+- `client_secret` - not used
+- user authentication - deepidv email, password, and MFA when required
 
 Setup and usage docs are in [mcp-server/README.md](mcp-server/README.md) and [mcp-server/llms-install.md](mcp-server/llms-install.md).
 
@@ -53,6 +56,8 @@ Setup and usage docs are in [mcp-server/README.md](mcp-server/README.md) and [mc
 The deepAI Assistant is a coding agent skill that activates in context when you're building a deepidv integration. Rather than bouncing between docs and your editor, you get SDK guidance, error explanations, webhook setup help, and compliance workflow advice right in your editor.
 
 The assistant loads automatically when a coding agent detects deepidv SDK usage, API calls, webhook configuration, or KYC workflow implementation in the active codebase. It covers the Node.js and Python SDKs and all public API surfaces.
+
+See [skills/deepai-assistant/SKILL.md](skills/deepai-assistant/SKILL.md) for the current integration workflow, auth guidance, and troubleshooting notes.
 
 ## Marketplace Distribution
 
