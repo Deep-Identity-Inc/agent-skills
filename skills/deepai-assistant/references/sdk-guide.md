@@ -1,4 +1,4 @@
-# deepidv SDK and API Integration Guide
+# deepidv TypeScript Server SDK and API Integration Guide
 
 Use this guide when helping a developer wire deepidv into an application.
 
@@ -6,9 +6,9 @@ Use this guide when helping a developer wire deepidv into an application.
 
 deepidv integrations typically use one of three surfaces:
 
-- SDK or direct REST API for application-managed verification and screening
+- `@deepidv/server` for backend TypeScript verification and screening flows
+- direct REST API for explicit HTTP integration work
 - hosted MCP for tool-based access inside an MCP-compatible client
-- webhook or redirect handling for completion callbacks inside the caller's app
 
 Keep the auth model aligned to the surface being used.
 
@@ -16,7 +16,7 @@ Keep the auth model aligned to the surface being used.
 
 Use API-key authentication for SDK and direct REST integrations.
 
-Base URL:
+REST base URL:
 
 - `https://api.deepidv.com/v1`
 
@@ -32,80 +32,125 @@ Suggested local credential lookup order:
 2. `.deepidv/credentials` in the project root
 3. `.deepidv/credentials` in the user home directory
 
-Sandbox and production share the same base URL. The key determines which mode
-the request runs in.
+Sandbox and production share the same API hostname. The key determines which
+mode the request runs in.
 
-## Node.js Setup
+## Canonical TypeScript Package
+
+For backend TypeScript integrations, use `@deepidv/server`.
 
 ```bash
-npm install @deepidv/sdk
+npm install @deepidv/server
 ```
 
-```javascript
-import { DeepIDV } from "@deepidv/sdk";
+```bash
+pnpm add @deepidv/server
+```
+
+```bash
+yarn add @deepidv/server
+```
+
+```bash
+bun add @deepidv/server
+```
+
+This SDK is backend-first. Keep it in a trusted server, worker, or edge runtime
+and do not ship it to a browser or mobile client.
+
+## TypeScript Setup
+
+```typescript
+import { DeepIDV } from '@deepidv/server';
 
 const client = new DeepIDV({
-  apiKey: process.env.DEEPIDV_API_KEY,
+  apiKey: process.env.DEEPIDV_API_KEY!,
 });
 ```
 
-Example liveness call:
+## Namespace Map
 
-```javascript
-const result = await client.verify.liveness({
-  image: base64Image,
+Use the documented namespaces only:
+
+| Namespace | Methods | Use it for |
+| --------- | ------- | ---------- |
+| `client.sessions` | `create`, `retrieve`, `list`, `updateStatus` | Hosted verification sessions |
+| `client.document` | `scan` | Document OCR and extraction |
+| `client.face` | `detect`, `compare`, `estimateAge` | Face primitives |
+| `client.identity` | `verify` | One-call identity verification |
+| `client.screening` | `pepSanctions`, `titleCheck`, `adverseMedia` | Silent screening |
+| `client.asyncJobs` | `get` | Poll long-running async jobs |
+
+Do not invent undocumented SDK namespaces such as `client.workflows.*`. If the
+developer needs workflow management, use the REST management API docs unless a
+published SDK surface exists.
+
+### Example hosted session flow
+
+```typescript
+const session = await client.sessions.create({
+  firstName: 'Jane',
+  lastName: 'Doe',
+  email: 'jane@example.com',
+  phone: '+15551234567',
 });
 
-console.log(result.result.is_live);
+console.log(session.sessionUrl);
 ```
 
-## Python Setup
+### Example server-to-server flow
 
-```bash
-pip install deepidv
-```
+```typescript
+import { readFileSync } from 'node:fs';
 
-```python
-import os
-from deepidv import DeepIDV
+const verification = await client.identity.verify({
+  documentImage: readFileSync('passport.jpg'),
+  faceImage: readFileSync('selfie.jpg'),
+});
 
-client = DeepIDV(api_key=os.environ["DEEPIDV_API_KEY"])
+console.log(verification.verified);
+console.log(verification.overallConfidence);
 ```
 
 ## Canonical Workflow Patterns
 
 ### Start a Verification Journey
 
-1. Discover or create the workflow.
-2. Create the session with `POST /v1/sessions`.
-3. Redirect the applicant to `session_url`.
-4. Reconcile the final outcome with `GET /v1/sessions/{id}`.
+1. Create the session with `client.sessions.create(...)`.
+2. Redirect the applicant to `session.sessionUrl`.
+3. Reconcile the final outcome with `client.sessions.retrieve(session.id)`.
+4. Update the final status with `client.sessions.updateStatus(...)` if needed.
+
+If the developer already has a workflow ID, pass it as `workflowId` during
+session creation.
 
 ### Run Screening
 
-Use these public endpoints:
+Use these documented SDK methods:
 
-- `POST /v1/screening/pep-sanctions`
-- `POST /v1/screening/title-check`
-- `POST /v1/screening/adverse-media`
-- `GET /v1/async-jobs/{jobId}`
+- `client.screening.pepSanctions(...)`
+- `client.screening.titleCheck(...)`
+- `client.screening.adverseMedia(...)`
+- `client.asyncJobs.get(jobId)`
 
 Important:
 
 - PEP and sanctions screening is synchronous.
 - Title check is synchronous and returns typed `status` variants such as
   `found`, `multiple_properties`, `unsupported_region`, and `not_found`.
-- Adverse-media screening is asynchronous and returns a `jobId` first.
+- Adverse-media screening is asynchronous and returns a handle or `jobId`
+  first.
+- `pepSanctions` and `titleCheck` fail fast on `503` rather than auto-retrying
+  through the SDK.
 
 ### Workflows
 
 Use workflows when business rules depend on a defined sequence of checks.
 
-- Discover available workflows with `GET /v1/workflows`.
-- Retrieve one workflow with `GET /v1/workflows/{id}` when the resolved config
-  matters.
-- Create a new workflow with `POST /v1/workflows` when the integration owns
-  workflow provisioning.
+- Pass `workflowId` to `client.sessions.create(...)` when a workflow is already
+  defined.
+- Use the REST management API docs when the integration needs workflow
+  creation, listing, or retrieval.
 
 ## Hosted MCP Auth
 
@@ -131,9 +176,11 @@ Do not repurpose an API key as a hosted MCP `client_secret`.
 | Option | Type | Default | Notes |
 | ------ | ---- | ------- | ----- |
 | `apiKey` | string | - | Required for SDK and direct REST usage |
-| `baseUrl` | string | `https://api.deepidv.com/v1` | Shared by sandbox and production |
-| `timeout` | number | `30000` | Adjust for network conditions and long-running flows |
-| `retries` | number | `3` | Use conservative retries for idempotent reads only |
+| `baseUrl` | string | `https://api.deepidv.com` | SDK constructor default |
+| `timeout` | number | `30000` | Per-attempt API timeout |
+| `uploadTimeout` | number | `120000` | Per-attempt upload timeout |
+| `maxRetries` | number | `3` | Automatic retries for `429` and `5xx` where supported |
+| `initialRetryDelay` | number | `500` | Base delay for exponential backoff |
 
 ## Practical Guidance
 
@@ -144,6 +191,9 @@ Do not repurpose an API key as a hosted MCP `client_secret`.
 - Use an `Idempotency-Key` when retrying async adverse-media creation so the
   integration does not create duplicate screening jobs.
 - Treat `429` as a signal to slow down rather than to fan out retries.
+- Handle typed SDK errors explicitly, especially `AuthenticationError`,
+  `RateLimitError`, `TimeoutError`, `ServiceUnavailableError`,
+  `AdverseMediaFailedError`, and `PollTimeoutError`.
 
 For exact request and response shapes, use the verify-skill reference files:
 

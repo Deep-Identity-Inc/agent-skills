@@ -55,7 +55,7 @@ Setup and usage docs are in [mcp-server/README.md](mcp-server/README.md) and [mc
 
 The deepAI Assistant is a coding agent skill that activates in context when you're building a deepidv integration. Rather than bouncing between docs and your editor, you get SDK guidance, error explanations, webhook setup help, and compliance workflow advice right in your editor.
 
-The assistant loads automatically when a coding agent detects deepidv SDK usage, API calls, webhook configuration, or KYC workflow implementation in the active codebase. It covers the Node.js and Python SDKs and all public API surfaces.
+The assistant loads automatically when a coding agent detects deepidv SDK usage, API calls, webhook configuration, or KYC workflow implementation in the active codebase. It is aligned to the published `@deepidv/server` TypeScript docs and the public API surfaces so it can steer developers toward documented integration patterns.
 
 See [skills/deepai-assistant/SKILL.md](skills/deepai-assistant/SKILL.md) for the current integration workflow, auth guidance, and troubleshooting notes.
 

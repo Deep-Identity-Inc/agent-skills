@@ -16,12 +16,26 @@ the URL, determines whether traffic is sandbox or production.
 **Q: How do SDK and direct API calls authenticate?**
 A: Use `x-api-key` with a deepidv API key.
 
+**Q: Which npm package should I use for a TypeScript backend integration?**
+A: Use `@deepidv/server` and construct a `DeepIDV` client from it.
+
+**Q: Can I use `@deepidv/server` in the browser?**
+A: No. It is a backend-first SDK and should run only in a trusted server,
+worker, or edge runtime.
+
 **Q: What base URL should I use for the public API?**
 A: `https://api.deepidv.com/v1`
+
+**Q: What is the SDK constructor default `baseUrl`?**
+A: `https://api.deepidv.com`. The SDK handles the endpoint paths internally.
 
 **Q: Should I create workflows before sessions?**
 A: Create or choose a workflow first when the business flow depends on a known
 sequence of checks. Otherwise you can create a standalone session directly.
+
+**Q: Does the TypeScript SDK expose `client.workflows.*` methods?**
+A: Not in the published docs. Use `workflowId` when creating sessions, and use
+the REST management API docs if you need workflow create/list/retrieve flows.
 
 **Q: How do I handle rate limits?**
 A: Treat `429` as a hard stop, back off, reduce concurrency, and avoid broad
@@ -37,6 +51,10 @@ return synchronously.
 **Q: How does adverse-media screening work?**
 A: `POST /v1/screening/adverse-media` queues a job and returns a `jobId`. Poll
 `GET /v1/async-jobs/{jobId}` until the job reaches `ready` or `failed`.
+
+**Q: How does adverse-media screening work in the TypeScript SDK?**
+A: `client.screening.adverseMedia(...)` returns a handle with a `jobId`. Use
+the handle or `client.asyncJobs.get(jobId)` to poll until the job is complete.
 
 **Q: Is `unsupported_region` from title check an error?**
 A: No. It is a typed success result that tells the caller title search is

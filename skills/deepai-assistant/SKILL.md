@@ -34,7 +34,7 @@ deepidv integration.
 
 Use this skill when the user is:
 
-- integrating the deepidv SDK into an application
+- integrating `@deepidv/server` into a backend TypeScript application
 - making direct REST API calls to deepidv
 - configuring or debugging a hosted MCP setup
 - implementing verification, workflow, or screening flows
@@ -48,12 +48,35 @@ skill with `deepidv-verify` instead of inventing request shapes from memory.
 
 This assistant should keep the product surfaces separate:
 
+- `@deepidv/server` is the canonical backend TypeScript SDK
 - REST API and SDK usage authenticate with `x-api-key`
 - hosted MCP usage authenticates with OAuth 2.0 and PKCE
 - webhook handling is integration-specific and should be implemented in the
   caller's backend, not in a browser client
 
 Do not tell users to mix these auth models.
+
+## Canonical TypeScript Path
+
+When the user is writing TypeScript, default to the published server SDK docs:
+
+```typescript
+import { DeepIDV } from '@deepidv/server';
+
+const client = new DeepIDV({
+  apiKey: process.env.DEEPIDV_API_KEY!,
+});
+```
+
+Important rules from the TypeScript docs:
+
+- `@deepidv/server` is backend-first and should run in a trusted runtime
+- do not suggest using it in a browser or mobile client
+- the documented namespaces are `sessions`, `document`, `face`, `identity`,
+  `screening`, and `asyncJobs`
+- do not invent undocumented SDK namespaces such as `client.workflows.*`
+- if the user needs workflow management, guide them to the REST management API
+  docs unless a documented SDK surface exists
 
 ## Authentication Guidance
 
@@ -65,9 +88,13 @@ Use API-key authentication:
 x-api-key: <api_key>
 ```
 
-Base URL:
+REST base URL:
 
 - `https://api.deepidv.com/v1`
+
+SDK default `baseUrl`:
+
+- `https://api.deepidv.com`
 
 Credential lookup guidance for local tooling:
 
@@ -111,22 +138,44 @@ When helping a developer, prefer this sequence:
 
 ### Verification Session Flow
 
-Use this pattern when the user needs an applicant verification journey:
+Use this pattern when the user needs a hosted applicant verification journey:
 
-1. Discover or choose a workflow with `GET /v1/workflows`.
-2. Create a session with `POST /v1/sessions`.
-3. Redirect the applicant to `session_url`.
-4. Reconcile completion with `GET /v1/sessions/{id}` for the authoritative
-   result.
+1. Create a session with `client.sessions.create(...)`.
+2. Redirect the applicant to `session.sessionUrl`.
+3. Reconcile completion with `client.sessions.retrieve(session.id)`.
+4. Use `client.sessions.updateStatus(...)` if the review flow requires a final
+   operator-set status.
+
+If the user already has a workflow ID, pass it as `workflowId` during session
+creation. Do not suggest undocumented SDK methods for listing or creating
+workflows.
+
+### Server-to-Server Flow
+
+Use this pattern when the user controls the verification UX and wants to call
+primitives directly:
+
+- `client.document.scan(...)`
+- `client.face.detect(...)`
+- `client.face.compare(...)`
+- `client.face.estimateAge(...)`
+- `client.identity.verify(...)`
 
 ### Screening Flow
 
 Use this routing:
 
-- `POST /v1/screening/pep-sanctions` for synchronous watchlist results
-- `POST /v1/screening/title-check` for synchronous title or ownership search
-- `POST /v1/screening/adverse-media` when async polling is acceptable
-- `GET /v1/async-jobs/{jobId}` to poll adverse-media results
+- `client.screening.pepSanctions(...)` for synchronous watchlist results
+- `client.screening.titleCheck(...)` for synchronous title or ownership search
+- `client.screening.adverseMedia(...)` when async polling is acceptable
+- `client.asyncJobs.get(jobId)` or the returned handle for polling
+
+Important TypeScript SDK behavior:
+
+- `pepSanctions` and `titleCheck` are synchronous
+- `adverseMedia` returns an async handle or job to poll
+- `pepSanctions` and `titleCheck` deliberately do not auto-retry through the
+  SDK when the upstream returns `503`
 
 ### Hosted MCP Flow
 
@@ -143,12 +192,24 @@ Use this pattern when the developer is integrating an MCP-compatible client:
 
 ### REST or SDK Errors
 
+- `ValidationError`: bad input or config before the call is valid
 - `401`: wrong or missing API key
 - `400`: payload or parameter mismatch
 - `403`: wrong org context or unsupported key type for the action
 - `429`: back off and reduce concurrency
 - `503` on screening endpoints: treat as provider-side failure and retry
   cautiously
+
+Important TypeScript SDK error classes to use when the user is coding:
+
+- `AuthenticationError`
+- `AuthorizationError`
+- `RateLimitError`
+- `TimeoutError`
+- `NetworkError`
+- `ServiceUnavailableError`
+- `AdverseMediaFailedError`
+- `PollTimeoutError`
 
 ### MCP Setup Errors
 
@@ -161,9 +222,25 @@ Use this pattern when the developer is integrating an MCP-compatible client:
 
 ### Async Screening Confusion
 
-- `POST /v1/screening/adverse-media` is not the final result.
-- The first response returns a `jobId`.
-- Poll `GET /v1/async-jobs/{jobId}` until `status` is `ready` or `failed`.
+- `client.screening.adverseMedia(...)` is not the final result.
+- The first response returns a handle with a `jobId`.
+- Poll with the handle or `client.asyncJobs.get(jobId)` until the job is
+  `ready` or `failed`.
+- A poll timeout does not mean the job died; it may still complete server-side.
+
+## Configuration Guidance
+
+When helping with `@deepidv/server` setup, align to the published defaults:
+
+- `baseUrl`: `https://api.deepidv.com`
+- `timeout`: `30000`
+- `uploadTimeout`: `120000`
+- `maxRetries`: `3`
+- `initialRetryDelay`: `500`
+- `fetch`: `globalThis.fetch` by default
+
+Do not tell developers that the SDK base URL default is `/v1`; that path detail
+belongs to the REST API endpoints, not the SDK constructor defaults.
 
 ## Safety and Data Handling
 
